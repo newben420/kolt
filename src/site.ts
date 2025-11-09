@@ -1,0 +1,46 @@
+import { config } from "dotenv";
+import {Keypair} from "@solana/web3.js";
+import { JSONSafeParse } from "./lib/json_safe_parse";
+const args = process.argv.slice(2);
+config({
+    path: args[0] || ".env",
+});
+
+const keyArray = JSONSafeParse(process.env.PRIVATE_KEY ?? "[]", true);
+const key = new Uint8Array(keyArray);
+const keypair = Keypair.fromSecretKey(key);
+
+export class Site {
+    static TITLE: string = process.env["TITLE"] || "Dusty";
+    static ROOT: string = process.cwd() || __dirname;
+    static PORT: number = parseInt(process.env["PORT"] || "0") || 3000;
+    static PRODUCTION = (process.env["PRODUCTION"] || "").toLowerCase() == "true";
+    static FORCE_FAMILY_4 = (process.env["FORCE_FAMILY_4"] || "").toLowerCase() == "true";
+    static EXIT_ON_UNCAUGHT_EXCEPTION = (process.env["EXIT_ON_UNCAUGHT_EXCEPTION"] || "").toLowerCase() == "true";
+    static EXIT_ON_UNHANDLED_REJECTION = (process.env["EXIT_ON_UNHANDLED_REJECTION"] || "").toLowerCase() == "true";
+    static URL = Site.PRODUCTION ? (process.env["PROD_URL"] || "") : `http://localhost:${Site.PORT}`;
+    static MAX_ALLOWED_FLOG_LOG_WEIGHT: number = parseInt(process.env["MAX_ALLOWED_FLOG_LOG_WEIGHT"] || "0") || 5;
+
+    static TG_TOKEN: string = process.env["TG_TOKEN"] ?? "";
+    static TG_CHAT_ID: number = parseInt(process.env["TG_CHAT_ID"] ?? "0") || 0;
+    static TG_POLLING: boolean = (process.env["TG_POLLING"] || "").toLowerCase() == "true";
+    static TG_WH_SECRET_TOKEN: string = process.env["TG_WH_SECRET_TOKEN"] ?? "edqfwvrebwtn7f";
+    static TG_BOT_URL: string = process.env["TG_BOT_URL"] ?? "";
+
+    static WS_URL: string = process.env.WS_URL || "wss://pumpportal.fun/api/data";
+    static WS_RECON_DELYAY_MS: number = parseInt(process.env.WS_RECON_DELYAY_MS || "0") || 5000;
+
+    static RPC: string = process.env["RPC"] || "https://api.mainnet-beta.solana.com";
+    static PF_API: string = process.env["PF_API"] || "https://frontend-api-v3.pump.fun";
+
+    static MAX_TOP_HOLDERS: number = parseInt(process.env["MAX_TOP_HOLDERS"] || "0") || 10;
+
+    static NETWORK_FEE: number = parseFloat(process.env["NETWORK_FEE"] || "0") || 0.000005;
+    static KEYPAIR = keypair;
+
+    static PS_DEFAULT_DETAILS = Object.fromEntries((process.env.PS_DEFAULT_DETAILS || "").split(" ").filter(x => x.length > 0).map(x => x.split("=")).filter(x => x.length == 2).map(x => ([x[0], x[1]])));
+    static PS_RECONNECT_TIMEOUT_MS: number = parseInt(process.env.PS_RECONNECT_TIMEOUT_MS || "0") || 0;
+    static PS_MAX_RECON_RETRIES: number = parseInt(process.env.PS_MAX_RECON_RETRIES || "0") || 5;
+    static PS_PF_TOTAL_SUPPLY: number = parseFloat(process.env.PS_PF_TOTAL_SUPPLY || "0") || 1_000_000_000_000_000;
+    static PS_RETRIES_INTERVAL_MS: number = parseInt(process.env.PS_RETRIES_INTERVAL_MS || "0") || 5000;
+}
