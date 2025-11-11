@@ -211,4 +211,31 @@ export class MainEngine {
             Log.flow([SLUG, `Garbage Collector`, `Removed ${removed} traders/pools (total: ${Object.keys(this.traders).length}).`], WEIGHT);
         }
     }
+
+    /**
+     * Returns the top N performing traders ranked by total (realized + unrealized) PnL.
+     * @param limit Number of traders to return (default 10)
+     */
+    private static getTopTraders(limit: number = 10) {
+        const scores = Object.entries(MainEngine.traders).map(([address, trader]) => {
+            const totalRealized = Object.values(trader.pools).reduce((sum, p) => sum + p.realizedPnL, 0);
+            const totalUnrealized = Object.values(trader.pools).reduce((sum, p) => sum + p.unrealizedPnL, 0);
+            const totalPnL = totalRealized + totalUnrealized;
+
+            return {
+                address,
+                totalPnL,
+                realizedPnL: totalRealized,
+                unrealizedPnL: totalUnrealized,
+                tier: trader.tier,
+                currentHoldings: Object.values(trader.pools).reduce((sum, p) => sum + p.currentHoldings, 0)
+            };
+        });
+
+        scores.sort((a, b) => b.totalPnL - a.totalPnL); // descending
+
+        Log.flow([SLUG, `Leaderboard`, `Top ${limit} traders:`, scores.slice(0, limit).map(t => `${t.address} (${formatNumber(t.totalPnL)})`).join(', ')], WEIGHT);
+
+        return scores.slice(0, limit);
+    }
 }
