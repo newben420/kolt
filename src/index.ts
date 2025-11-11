@@ -12,6 +12,8 @@ import { TelegramEngine } from './engine/telegram';
 import { getDateTime } from './lib/date_time';
 import { WebSocket } from 'ws';
 import { JSONSafeParse } from './lib/json_safe_parse';
+import PumpswapEngine from './engine/pumpswap';
+import { SourceEngine } from './engine/source';
 
 const app = express();
 const server = http.createServer(app);
@@ -116,9 +118,9 @@ const proceedAfterInit = () => {
             Log.flow([SLUG, `Message`, `${message.message}`], WEIGHT);
         }
         else {
-            // if (message.txType == "migrate") {
-            //     MainEngine.newMigration(message);
-            // }
+            if (message.txType == "migrate") {
+                SourceEngine.newMigration(message);
+            }
         }
     });
 }

@@ -1,5 +1,3 @@
-// PumpswapEngine.ts
-
 import { Site } from "./../site";
 import { connect, NatsConnection, StringCodec, Subscription } from "nats.ws";
 import { Log } from "./../lib/log";
@@ -7,9 +5,13 @@ import { parseHexFloat } from "../lib/parse_hex_float";
 import axios from "axios";
 import { getTimeElapsed } from "../lib/date_time";
 
-let TokenEngine: any = null;
-let ObserverEngine: any = null;
-let WhaleEngine: any = null;
+let cachedMainEngine: typeof import('./main').MainEngine | null = null;
+const MainEngine = async () => {
+    if (!cachedMainEngine) {
+        cachedMainEngine = ((await import('./main'))).MainEngine;
+    }
+    return cachedMainEngine;
+}
 
 const MAX_RETRIES = Site.PS_MAX_RECON_RETRIES;
 let RETRIES = 0;
@@ -38,8 +40,8 @@ export default class PumpswapEngine {
     private static server: string = Site.PS_DEFAULT_DETAILS.server;
     private static nc: NatsConnection | null = null;
     private static subscriptions: Map<string, SubscriptionEntry> = new Map();
-    private static metadata: Map<string, Metadata> = new Map();
-    private static mintPoolPairs: string[] = [];
+    // private static metadata: Map<string, Metadata> = new Map();
+    // private static mintPoolPairs: string[] = [];
     private static decode = StringCodec();
 
     private static connect = async (): Promise<boolean> => {
@@ -132,25 +134,25 @@ export default class PumpswapEngine {
                 const decoded = PumpswapEngine.decode.decode(msg.data);
                 try {
                     const json = JSON.parse(JSON.parse(decoded));
-                    if (json.name && json.data && ["buyevent", "sellevent"].includes(json.name.toLowerCase())) {
-                        const data = PumpswapEngine.parseMessage(json.data);
-                        json.data = data;
+                    if (json.data && json.data.user && PumpswapEngine.traders.includes(json.data.user as string)) {
+                        if (json.name && ["buyevent", "sellevent"].includes(json.name.toLowerCase())) {
+                            const data = PumpswapEngine.parseMessage(json.data);
+                            json.data = data;
 
-                        if (json.index) json.index = parseHexFloat(json.index) || 0;
-                        if (json.slot) json.slot = parseHexFloat(json.slot) || 0;
-                        if (json.data.timestamp) json.data.timestamp *= 1000;
-                        if (json.receivedAt && json.data.timestamp)
-                            json.latency = Math.abs(json.receivedAt - json.data.timestamp);
+                            if (json.index) json.index = parseHexFloat(json.index) || 0;
+                            if (json.slot) json.slot = parseHexFloat(json.slot) || 0;
+                            if (json.data.timestamp) json.data.timestamp *= 1000;
+                            if (json.receivedAt && json.data.timestamp)
+                                json.latency = Math.abs(json.receivedAt - json.data.timestamp);
 
-                        const meta = PumpswapEngine.metadata.get(json.data.pool);
-                        if (meta) {
-                            const baseDec = 10 ** meta.baseDec;
-                            const quoteDec = 10 ** meta.quoteDec;
+                            const baseDec = 10 ** 6;
+                            const quoteDec = 10 ** 9;
                             const baseRes = Number(json.data.poolBaseTokenReserves) / baseDec;
                             const quoteRes = Number(json.data.poolQuoteTokenReserves) / quoteDec;
 
                             json.data.priceSol = quoteRes / baseRes;
-                            json.data.marketcapSol = json.data.priceSol * meta.totalSupply / 10 ** meta.baseDec;
+
+                            json.data.marketcapSol = json.data.priceSol * Site.PS_PF_TOTAL_SUPPLY / 10 ** 6;
 
                             const isBuy = (json.name || '').toLowerCase().includes('buy');
                             const ppOBJ: any = {
@@ -161,26 +163,17 @@ export default class PumpswapEngine {
                                 signature: json.tx,
                                 pool: "pump-amm",
                                 newTokenBalance: isBuy ? json.data.userBaseTokenReserves : json.data.userQuoteTokenReserves,
+                                priceSol: json.data.priceSol,
                                 marketCapSol: json.data.marketcapSol,
                                 latencyMS: json.latency
                             };
 
-                            const mint = (PumpswapEngine.mintPoolPairs.find(x => x.endsWith(`#${json.data.pool}#`)) || '')
-                                .split("#")
-                                .filter(x => x.length > 0)[0];
-                            if (mint) ppOBJ.mint = mint;
-
-                            if (!TokenEngine) TokenEngine = require("./token");
-                            if (!ObserverEngine) ObserverEngine = require("../kiko/observer");
-                            if (!WhaleEngine) WhaleEngine = require("./whale").WhaleEngine;
-
-                            TokenEngine.newTrade(ppOBJ);
-                            WhaleEngine.newTrade(ppOBJ);
+                            (await MainEngine()).newTrade(ppOBJ);
                             callback(ppOBJ);
+                        } else {
+                            Log.dev("Unknown event message");
+                            Log.dev(json);
                         }
-                    } else {
-                        Log.dev("Unknown event message");
-                        Log.dev(json);
                     }
                 } catch (error) {
                     Log.dev(error);
@@ -243,86 +236,40 @@ export default class PumpswapEngine {
         }
     };
 
-    private static resolveMetadata = async (mint: string): Promise<Metadata | null> => {
-        try {
-            const [r, s] = (
-                await Promise.all([
-                    axios.get(`https://swap-api.pump.fun/v1/pools/pair?mintA=So11111111111111111111111111111111111111112&mintB=${mint}&sort=liquidity`),
-                    axios.get(`https://frontend-api-v3.pump.fun/coins/${mint}`)
-                ])
-            ).map(x => x.data);
+    private static traders: string[] = [];
 
-            if (Array.isArray(r) && r.length > 0 && r[0].address && r[0].lpSupply && r[0].liquidityUSD && s && s.total_supply) {
-                return {
-                    pool: r[0].address,
-                    baseDec: parseInt(r[0].baseMintDecimals) || 0,
-                    quoteDec: parseInt(r[0].quoteMintDecimals) || 0,
-                    lpSupply: parseFloat(r[0].lpSupply) || 0,
-                    totalSupply: parseFloat(s.total_supply) || Site.PS_PF_TOTAL_SUPPLY,
-                    liquidUSD: parseFloat(r[0].liquidityUSD) || 0
-                };
-            }
-            return null;
-        } catch (error) {
-            Log.dev(error);
-            return null;
+    static monitorTrader = (address: string): boolean => {
+        Log.flow([SLUG, `MonitorTrader`, address], WEIGHT);
+        if (!PumpswapEngine.traders.includes(address)) {
+            PumpswapEngine.traders.push(address);
         }
+        PumpswapEngine.connectorChecker();
+        return true;
     };
 
-    static monitor = async (mint: string, callback: (data: any) => void = () => { }, retries = 0): Promise<boolean> => {
-        Log.flow([SLUG, `Monitor`, mint, `${retries ? `Retry ${retries}` : `Initialized`}.`], WEIGHT);
-        const meta = await PumpswapEngine.resolveMetadata(mint);
-
-        const retry = () => {
-            if (retries < MAX_RETRIES && MAX_RETRIES && RETRY_INTERVAL) {
-                Log.flow([SLUG, `Monitor`, mint, `Failed. Attempting retry ${(retries + 1)} in ${getTimeElapsed(0, RETRY_INTERVAL)}.`], WEIGHT);
-                setTimeout(() => PumpswapEngine.monitor(mint, callback, retries + 1), RETRY_INTERVAL);
-            }
-        };
-
-        if (!meta) {
-            Log.flow([SLUG, `Monitor`, mint, `Could not get metadata.`], WEIGHT);
-            retry();
-            return false;
+    private static connectorChecker = () => {
+        if (PumpswapEngine.traders.length > 0) {
+            PumpswapEngine.sub(`ammTradeEvent.>`, data => {
+            });
         }
-
-        const { pool } = meta;
-        Log.flow([SLUG, `Monitor`, mint, `Pool obtained: ${pool}.`], WEIGHT);
-        const pairKey = `${mint}#${pool}#`;
-
-        if (PumpswapEngine.mintPoolPairs.includes(pairKey)) return false;
-
-        const subbed = PumpswapEngine.sub(`ammTradeEvent.${pool}`, callback);
-        if (subbed) {
-            PumpswapEngine.mintPoolPairs.push(pairKey);
-            PumpswapEngine.metadata.set(pool, meta);
-            return true;
+        else {
+            PumpswapEngine.unsub(`ammTradeEvent.>`);
         }
+    }
 
-        retry();
-        return false;
-    };
-
-    static unmonitor = async (mint: string): Promise<boolean> => {
-        Log.flow([SLUG, `Unmonitor`, mint, `Initialized.`], WEIGHT);
-        const pairKey = PumpswapEngine.mintPoolPairs.find(x => x.startsWith(`${mint}#`));
-        if (!pairKey) return false;
-
-        const pool = pairKey.split("#").filter(x => x.length > 0)[1];
-        if (!pool) {
-            Log.flow([SLUG, `Unmonitor`, mint, `Data not found.`], WEIGHT);
-            return false;
+    static unmonitorTrader = (address: string): boolean => {
+        Log.flow([SLUG, `UnmonitorTrader`, address], WEIGHT);
+        if (PumpswapEngine.traders.includes(address)) {
+            PumpswapEngine.traders.splice(PumpswapEngine.traders.indexOf(address), 1);
         }
-
-        PumpswapEngine.unsub(`ammTradeEvent.${pool}`);
-        PumpswapEngine.metadata.delete(pool);
-        PumpswapEngine.mintPoolPairs = PumpswapEngine.mintPoolPairs.filter(x => !x.startsWith(`${mint}#`));
+        PumpswapEngine.connectorChecker();
         return true;
     };
 
     static start = async (): Promise<boolean> => {
         if (!(await PumpswapEngine.updateCredentials())) return false;
-        return await PumpswapEngine.connect();
+        const connected = await PumpswapEngine.connect();
+        return connected;
     };
 
     static stop = async (): Promise<boolean> => {
