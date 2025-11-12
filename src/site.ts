@@ -43,4 +43,16 @@ export class Site {
     static PS_MAX_RECON_RETRIES: number = parseInt(process.env.PS_MAX_RECON_RETRIES || "0") || 5;
     static PS_PF_TOTAL_SUPPLY: number = parseFloat(process.env.PS_PF_TOTAL_SUPPLY || "0") || 1_000_000_000_000_000;
     static PS_RETRIES_INTERVAL_MS: number = parseInt(process.env.PS_RETRIES_INTERVAL_MS || "0") || 5000;
+
+    static MN_BAD_PNL_THRESHOLD: number = parseFloat(process.env['MN_BAD_PNL_THRESHOLD'] || "0") || -0.2;
+    static MN_MAX_BAD_SCORE: number = parseFloat(process.env['MN_MAX_BAD_SCORE'] || "0") || 3;
+    static MN_MEMORY_CAP: number = parseInt(process.env['MN_MEMORY_CAP'] || "0") || 5000;
+    static MN_INACTIVITY_TIMEOUT_MS: number = parseInt(process.env['MN_INACTIVITY_TIMEOUT_MS'] || "0") || 1800000;
+    
+    static TR_INTERVAL_MS: number = parseInt(process.env['TR_INTERVAL_MS'] || "0") || 180000;
+    static TR_MAX_TRADERS: number = parseInt(process.env['TR_MAX_TRADERS'] || "0") || 30;
+    static TR_SEND_AUTO_ADD: boolean = (process.env['TR_SEND_AUTO_ADD'] || '').toLowerCase() == "true";
+    static TR_SEND_AUTO_REM: boolean = (process.env['TR_SEND_AUTO_REM'] || '').toLowerCase() == "true";
+    static TR_SEND_ACTIVITY: boolean = (process.env['TR_SEND_ACTIVITY'] || '').toLowerCase() == "true";
+    static TR_INACTIVITY_TIMEOUT_MS: number = parseInt(process.env['TR_INACTIVITY_TIMEOUT_MS'] || "0") || 1800000;
 }

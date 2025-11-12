@@ -1,3 +1,4 @@
+import { isValidAddress } from './../lib/is_valid_address';
 import TelegramBot from 'node-telegram-bot-api';
 import { Site } from '../site';
 import { Log } from '../lib/log';
@@ -85,9 +86,17 @@ export class TelegramEngine {
                 let content = (msg.text || "").trim();
                 const pid = msg.chat.id || msg.from?.id;
                 const noteRegex = /^TITLE=(.+)\nBODY=([\s\S]+)$/;
+                const walletRegex = /^$/;
                 if (pid && pid == Site.TG_CHAT_ID) {
                     if (/^\/start$/.test(content)) {
                         TelegramEngine.sendMessage(TelegramEngine.startMessage());
+                    }
+                    else if(isValidAddress(content)){
+                        // TODO: continue here
+                        // add address to monitor and send confirmation or rejection message
+                        // elsewhere: implement addresses tracker management... outputting and removal
+                        // implement stats message: that shows stats of the system across various engines
+                        // test system
                     }
                     // else if (/^\/status$/.test(content)) {
                     //     const { inline, message } = TelegramEngine.statusMessage();
@@ -108,6 +117,16 @@ export class TelegramEngine {
             TelegramEngine.bot.on("callback_query", async (callbackQuery) => {
                 const pid = callbackQuery.message?.chat.id || callbackQuery.message?.from?.id;
                 if (pid && pid == Site.TG_CHAT_ID) {
+                    if (callbackQuery.data == "deletemessage") {
+                        try {
+                            TelegramEngine.bot.answerCallbackQuery(callbackQuery.id);
+                            if(callbackQuery.message?.message_id){
+                                TelegramEngine.deleteMessage(callbackQuery.message?.message_id);
+                            }
+                        } catch (error) {
+                            Log.dev(error);
+                        }
+                    }
                     // if (callbackQuery.data == "refreshstatus") {
                     //     try {
                     //         TelegramEngine.bot.answerCallbackQuery(callbackQuery.id);

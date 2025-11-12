@@ -1,3 +1,4 @@
+import { Site } from './../site';
 import { formatNumber } from './../lib/format_number';
 import { Log } from './../lib/log';
 import { PoolAddress, Trader, TraderAddress, TraderObj, TraderPool } from "./../model/main";
@@ -15,10 +16,10 @@ export class MainEngine {
     private static traders: TraderObj = {};
 
     // 🔧 Configurable constants
-    private static INACTIVITY_TIMEOUT_MS = 1000 * 60 * 30; // 30 mins
-    private static BAD_PNL_THRESHOLD = -0.2;
-    private static MAX_BAD_SCORE = 3;
-    private static MEMORY_CAP = 5000; // Max number of traders to keep in memory
+    private static INACTIVITY_TIMEOUT_MS = Site.MN_INACTIVITY_TIMEOUT_MS;
+    private static BAD_PNL_THRESHOLD = Site.MN_BAD_PNL_THRESHOLD;
+    private static MAX_BAD_SCORE = Site.MN_MAX_BAD_SCORE;
+    private static MEMORY_CAP = Site.MN_MEMORY_CAP; // Max number of traders to keep in memory
 
     // Tier rules
     private static TIER_MULTIPLIER = {
@@ -76,55 +77,57 @@ export class MainEngine {
         latencyMS: number;
         newTokenBalance: number;
     }) => {
-        const trader = MainEngine.newTrader(traderPublicKey);
-        const traderPool = MainEngine.getOrCreatePool(trader, pool);
+        if (MainEngine.traders[traderPublicKey]) {
+            const trader = MainEngine.newTrader(traderPublicKey);
+            const traderPool = MainEngine.getOrCreatePool(trader, pool);
 
-        trader.lastActive = Date.now();
-        traderPool.lastActive = Date.now();
-        traderPool.lastPriceSol = priceSol;
+            trader.lastActive = Date.now();
+            traderPool.lastActive = Date.now();
+            traderPool.lastPriceSol = priceSol;
 
-        if (txType === "buy") {
-            const pricePerToken = solAmount / tokenAmount;
-            traderPool.lots.push({
-                amount: tokenAmount,
-                pricePerToken,
-                timestamp: Date.now(),
-            });
-            traderPool.totalBuys += solAmount;
-            traderPool.currentHoldings += tokenAmount;
-        } else if (txType === "sell") {
-            let remainingToSell = tokenAmount;
-            const sellPrice = solAmount / tokenAmount;
-            traderPool.totalSells += solAmount;
+            if (txType === "buy") {
+                const pricePerToken = solAmount / tokenAmount;
+                traderPool.lots.push({
+                    amount: tokenAmount,
+                    pricePerToken,
+                    timestamp: Date.now(),
+                });
+                traderPool.totalBuys += solAmount;
+                traderPool.currentHoldings += tokenAmount;
+            } else if (txType === "sell") {
+                let remainingToSell = tokenAmount;
+                const sellPrice = solAmount / tokenAmount;
+                traderPool.totalSells += solAmount;
 
-            let pnlDelta = 0;
-            while (remainingToSell > 0 && traderPool.lots.length > 0) {
-                const lot = traderPool.lots[0];
-                const sellAmount = Math.min(lot.amount, remainingToSell);
-                const profit = (sellPrice - lot.pricePerToken) * sellAmount;
-                pnlDelta += profit;
-                lot.amount -= sellAmount;
-                remainingToSell -= sellAmount;
-                if (lot.amount <= 0) traderPool.lots.shift();
+                let pnlDelta = 0;
+                while (remainingToSell > 0 && traderPool.lots.length > 0) {
+                    const lot = traderPool.lots[0];
+                    const sellAmount = Math.min(lot.amount, remainingToSell);
+                    const profit = (sellPrice - lot.pricePerToken) * sellAmount;
+                    pnlDelta += profit;
+                    lot.amount -= sellAmount;
+                    remainingToSell -= sellAmount;
+                    if (lot.amount <= 0) traderPool.lots.shift();
+                }
+
+                traderPool.realizedPnL += pnlDelta;
+                traderPool.currentHoldings = Math.max(0, traderPool.currentHoldings - tokenAmount);
+
+                const roi = pnlDelta / (solAmount || 1);
+                traderPool.badScore = roi < this.BAD_PNL_THRESHOLD
+                    ? traderPool.badScore + 1
+                    : Math.max(0, traderPool.badScore - 1);
             }
 
-            traderPool.realizedPnL += pnlDelta;
-            traderPool.currentHoldings = Math.max(0, traderPool.currentHoldings - tokenAmount);
+            // Update unrealized PnL
+            MainEngine.updateUnrealizedPnL(traderPool);
 
-            const roi = pnlDelta / (solAmount || 1);
-            traderPool.badScore = roi < this.BAD_PNL_THRESHOLD
-                ? traderPool.badScore + 1
-                : Math.max(0, traderPool.badScore - 1);
+            // Tier recalibration
+            MainEngine.updateTraderTier(trader);
+
+            // Occasional cleanup
+            if (Math.random() < 0.02) MainEngine.collectGarbage();
         }
-
-        // Update unrealized PnL
-        MainEngine.updateUnrealizedPnL(traderPool);
-
-        // Tier recalibration
-        MainEngine.updateTraderTier(trader);
-
-        // Occasional cleanup
-        if (Math.random() < 0.02) MainEngine.collectGarbage();
     };
 
     private static updateUnrealizedPnL(pool: TraderPool) {
@@ -216,7 +219,7 @@ export class MainEngine {
      * Returns the top N performing traders ranked by total (realized + unrealized) PnL.
      * @param limit Number of traders to return (default 10)
      */
-    private static getTopTraders(limit: number = 10) {
+    static getTopTraders(limit: number = 10) {
         const scores = Object.entries(MainEngine.traders).map(([address, trader]) => {
             const totalRealized = Object.values(trader.pools).reduce((sum, p) => sum + p.realizedPnL, 0);
             const totalUnrealized = Object.values(trader.pools).reduce((sum, p) => sum + p.unrealizedPnL, 0);
@@ -237,5 +240,24 @@ export class MainEngine {
         Log.flow([SLUG, `Leaderboard`, `Top ${limit} traders:`, scores.slice(0, limit).map(t => `${t.address} (${formatNumber(t.totalPnL)})`).join(', ')], WEIGHT);
 
         return scores.slice(0, limit);
+    }
+
+    static getTraderStats = (address: string) => {
+        if(MainEngine.traders[address]){
+            const trader = MainEngine.traders[address];
+            const totalRealized = Object.values(trader.pools).reduce((sum, p) => sum + p.realizedPnL, 0);
+            const totalUnrealized = Object.values(trader.pools).reduce((sum, p) => sum + p.unrealizedPnL, 0);
+            const totalPnL = totalRealized + totalUnrealized;
+
+            return {
+                address,
+                totalPnL,
+                realizedPnL: totalRealized,
+                unrealizedPnL: totalUnrealized,
+                tier: trader.tier,
+                currentHoldings: Object.values(trader.pools).reduce((sum, p) => sum + p.currentHoldings, 0)
+            };
+        }
+        return null;
     }
 }

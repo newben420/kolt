@@ -13,6 +13,14 @@ const MainEngine = async () => {
     return cachedMainEngine;
 }
 
+let cachedTrackerEngine: typeof import('./tracker').TrackerEngine | null = null;
+const TrackerEngine = async () => {
+    if (!cachedTrackerEngine) {
+        cachedTrackerEngine = ((await import('./tracker'))).TrackerEngine;
+    }
+    return cachedTrackerEngine;
+}
+
 const MAX_RETRIES = Site.PS_MAX_RECON_RETRIES;
 let RETRIES = 0;
 const RETRY_INTERVAL = Site.PS_RETRIES_INTERVAL_MS;
@@ -134,7 +142,7 @@ export default class PumpswapEngine {
                 const decoded = PumpswapEngine.decode.decode(msg.data);
                 try {
                     const json = JSON.parse(JSON.parse(decoded));
-                    if (json.data && json.data.user && PumpswapEngine.traders.includes(json.data.user as string)) {
+                    if (json.data && json.data.user && (PumpswapEngine.traders.includes(json.data.user as string) || (await TrackerEngine()).traderExists(json.data.user as string))) {
                         if (json.name && ["buyevent", "sellevent"].includes(json.name.toLowerCase())) {
                             const data = PumpswapEngine.parseMessage(json.data);
                             json.data = data;
@@ -168,6 +176,7 @@ export default class PumpswapEngine {
                                 latencyMS: json.latency
                             };
 
+                            (await TrackerEngine()).newTrade(ppOBJ);
                             (await MainEngine()).newTrade(ppOBJ);
                             callback(ppOBJ);
                         } else {

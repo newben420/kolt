@@ -51,13 +51,10 @@ export class SourceEngine {
         try {
             const holders: {
                 address: string;
-                uiAmount: number;
-                decimals: number;
-                amount: string;
-                uiAmountString: string;
-            }[] = (await axios.get(`${Site.PF_API}/coins/top-holders/${mint}`)).data.topHolders.value;
-            const addresses = holders.map(x => x.address);
-            addresses.shift(); // REMOVE POSSIBLE BONDING ADDRESS
+                amount: any;
+            }[] = (await axios.get(`${Site.PF_API}/coins/holders/${mint}`)).data.holders;
+            const addresses = holders.sort((a, b) => parseFloat(b.amount) - parseFloat(a.amount)).map(x => x.address);
+            // addresses.shift(); // REMOVE POSSIBLE BONDING ADDRESS
             resolve(addresses.slice(0, Site.MAX_TOP_HOLDERS));
         } catch (error) {
             Log.dev(error);
@@ -74,23 +71,26 @@ export class SourceEngine {
             Log.flow([SLUG, mint, `Initiated.`], WEIGHT);
             const holdersTokenAddresses = await SourceEngine.getTopHolders(mint);
             if (holdersTokenAddresses.length > 0) {
-                Log.flow([SLUG, mint, `Holders' (${holdersTokenAddresses.length}) token addresses found.`], WEIGHT);
-                const accountOwners = await SourceEngine.getAccountOwners(holdersTokenAddresses);
-                if (accountOwners.length > 0) {
-                    Log.flow([SLUG, mint, `Holders' (${holdersTokenAddresses.length}) owners addresses found.`], WEIGHT);
-                    for(const owner of accountOwners){
-                        (await MainEngine()).newTrader(owner);
-                    }
+                for (const addr of holdersTokenAddresses) {
+                    (await MainEngine()).newTrader(addr);
                 }
-                else {
-                    Log.flow([SLUG, mint, `No holders' owners addresses found.`], WEIGHT);
-                    let m = `❌ Sourcing Failed\n\n\`\`\`\nNo holders' owners addresses found.\`\`\``;
-                    (await TelegramEngine()).sendMessage(m);
-                }
+                // Log.flow([SLUG, mint, `Holders' (${holdersTokenAddresses.length}) token addresses found.`], WEIGHT);
+                // const accountOwners = await SourceEngine.getAccountOwners(holdersTokenAddresses);
+                // if (accountOwners.length > 0) {
+                //     Log.flow([SLUG, mint, `Holders' (${holdersTokenAddresses.length}) owners addresses found.`], WEIGHT);
+                //     for(const owner of accountOwners){
+                //         (await MainEngine()).newTrader(owner);
+                //     }
+                // }
+                // else {
+                //     Log.flow([SLUG, mint, `No holders' owners addresses found.`], WEIGHT);
+                //     let m = `❌ Sourcing Failed\n\n\`\`\`\nNo holders' owners addresses found.\`\`\``;
+                //     (await TelegramEngine()).sendMessage(m);
+                // }
             }
             else {
-                Log.flow([SLUG, mint, `No holders' token addresses found.`], WEIGHT);
-                let m = `❌ Sourcing Failed\n\n\`\`\`\nNo holders' token addresses found.\`\`\``;
+                Log.flow([SLUG, mint, `No holders' addresses found.`], WEIGHT);
+                let m = `❌ Sourcing Failed\n\n\`\`\`\nNo holders' addresses found.\`\`\``;
                 (await TelegramEngine()).sendMessage(m);
             }
         }
