@@ -15,6 +15,10 @@ export class MainEngine {
 
     private static traders: TraderObj = {};
 
+    static tradersCount = () => Object.keys(MainEngine.traders).length;
+
+    static deletedTradersCount: number = 0;
+
     // 🔧 Configurable constants
     private static INACTIVITY_TIMEOUT_MS = Site.MN_INACTIVITY_TIMEOUT_MS;
     private static BAD_PNL_THRESHOLD = Site.MN_BAD_PNL_THRESHOLD;
@@ -184,6 +188,7 @@ export class MainEngine {
                 delete MainEngine.traders[addr];
                 Log.flow([SLUG, `Remove`, `${addr}`, `Total: ${formatNumber(Object.keys(MainEngine.traders).length)}.`], WEIGHT);
                 PumpswapEngine.unmonitorTrader(addr);
+                MainEngine.deletedTradersCount += 1;
                 removed++;
             }
         }

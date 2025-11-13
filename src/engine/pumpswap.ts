@@ -130,7 +130,7 @@ export default class PumpswapEngine {
         if (!PumpswapEngine.nc) return null;
 
         if (PumpswapEngine.subscriptions.has(topic) && !force) {
-            Log.flow([SLUG, `Subscribe`, `Already subscribed: ${topic}.`], WEIGHT);
+            // Log.flow([SLUG, `Subscribe`, `Already subscribed: ${topic}.`], WEIGHT);
             return null;
         }
 
@@ -142,7 +142,9 @@ export default class PumpswapEngine {
                 const decoded = PumpswapEngine.decode.decode(msg.data);
                 try {
                     const json = JSON.parse(JSON.parse(decoded));
+                    PumpswapEngine.messageCount += 1;
                     if (json.data && json.data.user && (PumpswapEngine.traders.includes(json.data.user as string) || (await TrackerEngine()).traderExists(json.data.user as string))) {
+                        PumpswapEngine.validMessageCount += 1;
                         if (json.name && ["buyevent", "sellevent"].includes(json.name.toLowerCase())) {
                             const data = PumpswapEngine.parseMessage(json.data);
                             json.data = data;
@@ -256,13 +258,19 @@ export default class PumpswapEngine {
         return true;
     };
 
+    static subscribed: boolean = false;
+    static messageCount: number = 0;
+    static validMessageCount: number = 0;
+
     private static connectorChecker = () => {
         if (PumpswapEngine.traders.length > 0) {
             PumpswapEngine.sub(`ammTradeEvent.>`, data => {
             });
+            PumpswapEngine.subscribed = true;
         }
         else {
             PumpswapEngine.unsub(`ammTradeEvent.>`);
+            PumpswapEngine.subscribed = false;
         }
     }
 

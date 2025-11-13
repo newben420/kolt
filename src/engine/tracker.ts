@@ -46,6 +46,8 @@ export class TrackerEngine {
     static traderExists = (address: string) => !!TrackerEngine.traders[address];
     static getTrader = (address: string) => TrackerEngine.traders[address];
 
+    static removedTradersCount: number = 0;
+
     static addTrader = (address: TrackedTraderAddress, manual: boolean, { pnl, rpnl, upnl }: {
         pnl?: number;
         upnl?: number;
@@ -77,6 +79,14 @@ export class TrackerEngine {
         }
         return true;
     }
+
+    static getAddressStartsWith = (pre: string) => Object.keys(TrackerEngine.traders).find(addr => addr.startsWith(pre)) || null;
+
+    static getTradersArray = () => Object.entries(TrackerEngine.traders).map(([address, trader]) => ({...trader, address})).sort((a, b) => a.timeAdded - b.timeAdded);
+
+
+    static getTopTradersCount = () => Object.entries(TrackerEngine.traders).map(([address, trader]) => trader).filter(tr => !tr.manuallyAdded).length;
+    static getManualTradersCount = () => Object.entries(TrackerEngine.traders).map(([address, trader]) => trader).filter(tr => tr.manuallyAdded).length;
 
     static newTrade = async ({
         solAmount,
@@ -118,7 +128,7 @@ export class TrackerEngine {
                     m += `MarketcapSOL 📊 \`${FFF(marketCapSol)}\`\n`;
                     m += `Token Amount 🪙 \`${FFF(tokenAmount)}\`\n`;
                     m += `Token Balance 💰 \`${FFF(newTokenBalance)}\`\n`;
-                    m += `PnL \`${FFF(stats.totalPnL)}\` 💰U \`${FFF(stats.unrealizedPnL)}\` 💰R \`${FFF(stats.realizedPnL)}\`\n`;
+                    if((stats.totalPnL || stats.unrealizedPnL || stats.realizedPnL) || (trader.pnl || trader.rpnl || trader.upnl)) m += `PnL \`${FFF(stats.totalPnL || trader.pnl || 0)}\` 💰U \`${FFF(stats.unrealizedPnL || trader.upnl || 0)}\` 💰R \`${FFF(stats.realizedPnL || trader.rpnl || 0)}\`\n`;
 
                     (await TelegramEngine()).sendMessage(m, undefined, {
                         parse_mode: 'MarkdownV2',
@@ -126,7 +136,7 @@ export class TrackerEngine {
                             inline_keyboard: [
                                 [
                                     {
-                                        text: "🗑 Delete",
+                                        text: "🗑 Message",
                                         callback_data: 'deletemessage',
                                     }
                                 ]
@@ -140,7 +150,8 @@ export class TrackerEngine {
 
     static removeTrader = (address: TrackedTraderAddress) => {
         if (TrackerEngine.traders[address]) {
-            delete TrackerEngine.traders[address]
+            delete TrackerEngine.traders[address];
+            TrackerEngine.removedTradersCount += 1;
             return true;
         }
         else {

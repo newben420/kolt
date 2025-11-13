@@ -62,18 +62,23 @@ export class SourceEngine {
         }
     });
 
+    static totalAddedTopTraders: number = 0;
+    static totalTokensMigrated: number = 0;
+
     static newMigration = async (
         { mint }: {
             mint: string;
         }
     ) => {
         if (mint) {
+            SourceEngine.totalTokensMigrated += 1;
             Log.flow([SLUG, mint, `Initiated.`], WEIGHT);
             const holdersTokenAddresses = await SourceEngine.getTopHolders(mint);
             if (holdersTokenAddresses.length > 0) {
                 for (const addr of holdersTokenAddresses) {
                     (await MainEngine()).newTrader(addr);
                 }
+                SourceEngine.totalAddedTopTraders += holdersTokenAddresses.length;
                 // Log.flow([SLUG, mint, `Holders' (${holdersTokenAddresses.length}) token addresses found.`], WEIGHT);
                 // const accountOwners = await SourceEngine.getAccountOwners(holdersTokenAddresses);
                 // if (accountOwners.length > 0) {
