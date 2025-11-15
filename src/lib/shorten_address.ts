@@ -1,6 +1,6 @@
 export const shortenAddress = (address: string, limit: number = 8) => {
     limit = Math.min(8, Math.max(2, limit));
-    const sep = "_";
+    const sep = "•";
     if(address.length <= limit){
         return address;
     }

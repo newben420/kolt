@@ -48,6 +48,7 @@ export class Site {
     static MN_MAX_BAD_SCORE: number = parseFloat(process.env['MN_MAX_BAD_SCORE'] || "0") || 3;
     static MN_MEMORY_CAP: number = parseInt(process.env['MN_MEMORY_CAP'] || "0") || 5000;
     static MN_INACTIVITY_TIMEOUT_MS: number = parseInt(process.env['MN_INACTIVITY_TIMEOUT_MS'] || "0") || 1800000;
+    static MN_GARBAGE_INTERVAL_MS: number = parseInt(process.env['MN_GARBAGE_INTERVAL_MS'] || "0") || 180000;
     
     static TR_INTERVAL_MS: number = parseInt(process.env['TR_INTERVAL_MS'] || "0") || 180000;
     static TR_MAX_TRADERS: number = parseInt(process.env['TR_MAX_TRADERS'] || "0") || 30;

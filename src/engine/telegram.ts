@@ -85,6 +85,7 @@ export class TelegramEngine {
         const MEDeletedTraders = (await MainEngine()).deletedTradersCount;
         const PESubbed = (await PumpswapEngine()).subscribed;
         const PETotalMessages = (await PumpswapEngine()).messageCount;
+        const PEAVGLatencyMS = ((await PumpswapEngine()).recentLatencies.reduce((a, b) => a + b, 0) / (await PumpswapEngine()).recentLatencies.length) || 0;
         const PEValidMessages = (await PumpswapEngine()).validMessageCount;
         const TETopTraders = (await TrackerEngine()).getTopTradersCount();
         const TEManualTraders = (await TrackerEngine()).getManualTradersCount();
@@ -102,6 +103,7 @@ export class TelegramEngine {
 
         message += `💊 *PumpSwap Engine*\n`;
         message += `Subscribed 🟰 ${PESubbed ? `Yes` : 'No'}\n`;
+        message += `AVG Latency 🟰 ${PEAVGLatencyMS.toFixed(0)}ms\n`;
         message += `Total Messages 🟰 ${FFF(PETotalMessages)}\n`;
         message += `Valid Messages 🟰 ${formatNumber(PEValidMessages)}\n`;
         message += `\n`;
@@ -130,7 +132,7 @@ export class TelegramEngine {
                 m += `🚀 ${trader.manuallyAdded ? `Manual` : `Top Trader`}\n`;
                 m += `🕝 ${getTimeElapsed(trader.timeAdded, Date.now())} 🔄 ${getTimeElapsed(trader.lastUpdated, Date.now())}\n`;
                 m += `🟩 ${formatNumber(trader.buys)} 🟥 ${formatNumber(trader.sells)}\n`
-                if (trader.pnl || trader.rpnl || trader.upnl) m += `💰 ${FFF(trader.pnl || 0)} 💰U ${FFF(trader.upnl || 0)} 💰R ${FFF(trader.rpnl || 0)}\n`;
+                if (trader.pnl || trader.rpnl || trader.upnl) m += `💰 ${FFF((trader.pnl || 0) * 100)}% 💰U ${FFF((trader.upnl || 0) * 100)}% 💰R ${FFF((trader.rpnl || 0) * 100)}%\n`;
                 inline.push([
                     {
                         text: `🗑 ${shortenAddress(trader.address)}`,
@@ -143,7 +145,7 @@ export class TelegramEngine {
 
         inline.push([
             {
-                text: `♻️ Refresh}`,
+                text: `♻️ Refresh`,
                 callback_data: `refreshtracker`,
             }
         ]);

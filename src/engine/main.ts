@@ -3,10 +3,19 @@ import { formatNumber } from './../lib/format_number';
 import { Log } from './../lib/log';
 import { PoolAddress, Trader, TraderAddress, TraderObj, TraderPool } from "./../model/main";
 import PumpswapEngine from './pumpswap';
+import { getTimeElapsed } from './../lib/date_time';
 
 const SLUG = "MainEngine";
 
 const WEIGHT = 3;
+
+let cachedTrackerEngine: typeof import('./tracker').TrackerEngine | null = null;
+const TrackerEngine = async () => {
+    if (!cachedTrackerEngine) {
+        cachedTrackerEngine = ((await import('./tracker'))).TrackerEngine;
+    }
+    return cachedTrackerEngine;
+}
 
 /**
  * This engine handles the main functionality of the system: managing tracked traders and their pnl.
@@ -68,7 +77,9 @@ export class MainEngine {
         traderPublicKey,
         txType,
         pool,
+        poolAddr,
         priceSol,
+        newTokenBalance,
     }: {
         solAmount: number;
         tokenAmount: number;
@@ -79,11 +90,12 @@ export class MainEngine {
         priceSol: number;
         marketCapSol: number;
         latencyMS: number;
+        poolAddr: string;
         newTokenBalance: number;
     }) => {
         if (MainEngine.traders[traderPublicKey]) {
             const trader = MainEngine.newTrader(traderPublicKey);
-            const traderPool = MainEngine.getOrCreatePool(trader, pool);
+            const traderPool = MainEngine.getOrCreatePool(trader, poolAddr);
 
             trader.lastActive = Date.now();
             traderPool.lastActive = Date.now();
@@ -97,7 +109,12 @@ export class MainEngine {
                     timestamp: Date.now(),
                 });
                 traderPool.totalBuys += solAmount;
-                traderPool.currentHoldings += tokenAmount;
+                if (newTokenBalance) {
+                    traderPool.currentHoldings = newTokenBalance;
+                }
+                else {
+                    traderPool.currentHoldings += tokenAmount;
+                }
             } else if (txType === "sell") {
                 let remainingToSell = tokenAmount;
                 const sellPrice = solAmount / tokenAmount;
@@ -130,7 +147,7 @@ export class MainEngine {
             MainEngine.updateTraderTier(trader);
 
             // Occasional cleanup
-            if (Math.random() < 0.02) MainEngine.collectGarbage();
+            // if (Math.random() < 0.02) MainEngine.collectGarbage();
         }
     };
 
@@ -165,9 +182,32 @@ export class MainEngine {
                     : "C";
     }
 
-    private static collectGarbage() {
+    static start = async () => {
+        MainEngine.collectGarbage();
+        return true;
+    }
+
+    private static async collectGarbage() {
         const now = Date.now();
-        let removed = 0;
+        const conclude = () => {
+            Log.flow([SLUG, `GC`, `Concluded.`], WEIGHT);
+            const stop = Date.now();
+            const duration = stop - now;
+            if (duration >= Site.MN_GARBAGE_INTERVAL_MS) {
+                MainEngine.collectGarbage();
+            }
+            else {
+                const remaining = Site.MN_GARBAGE_INTERVAL_MS - duration;
+                setTimeout(() => {
+                    MainEngine.collectGarbage();
+                }, remaining);
+                Log.flow([SLUG, `GC`, `Running again in ${getTimeElapsed(0, remaining)}.`], WEIGHT);
+            }
+        }
+        
+        Log.flow([SLUG, `GC`, `Initialized.`], WEIGHT);
+        let removedPools = 0;
+        let removedTraders = 0;
 
         // Memory cap enforcement
         const traderCount = Object.keys(MainEngine.traders).length;
@@ -183,13 +223,14 @@ export class MainEngine {
                 }))
                 .sort((a, b) => a.totalPnL - b.totalPnL); // ascending
 
-            const toRemove = sorted.slice(0, traderCount - MainEngine.MEMORY_CAP);
+            const TE = await TrackerEngine();
+            const toRemove = sorted.filter(t => !(TE.traderExists(t.addr))).slice(0, traderCount - MainEngine.MEMORY_CAP);
             for (const { addr } of toRemove) {
                 delete MainEngine.traders[addr];
-                Log.flow([SLUG, `Remove`, `${addr}`, `Total: ${formatNumber(Object.keys(MainEngine.traders).length)}.`], WEIGHT);
+                // Log.flow([SLUG, `GC`, `Remove`, `${addr}`, `Total left: ${formatNumber(Object.keys(MainEngine.traders).length)}.`], WEIGHT);
                 PumpswapEngine.unmonitorTrader(addr);
                 MainEngine.deletedTradersCount += 1;
-                removed++;
+                removedTraders++;
             }
         }
 
@@ -203,21 +244,24 @@ export class MainEngine {
                 const tooBad = pool.badScore >= MainEngine.MAX_BAD_SCORE;
                 if (inactive || tooBad) {
                     delete trader.pools[poolAddr];
-                    removed++;
+                    removedPools++;
                 }
             }
 
+            const TE = await TrackerEngine();
             const isEmpty = Object.keys(trader.pools).length === 0;
-            const stale = now - trader.lastActive > timeout * 2;
-            if (isEmpty || stale) {
+            const stale = now - trader.lastActive > timeout;
+            if (isEmpty && stale && (!TE.traderExists(traderAddr))) {
                 delete MainEngine.traders[traderAddr];
-                removed++;
+                removedTraders++;
             }
         }
 
-        if (removed > 0) {
-            Log.flow([SLUG, `Garbage Collector`, `Removed ${removed} traders/pools (total: ${Object.keys(this.traders).length}).`], WEIGHT);
+        if (removedTraders > 0 || removedPools > 0) {
+            Log.flow([SLUG, `GC`, `Removed ${removedTraders} trader${removedTraders == 1 ? '' : 's'} and ${removedPools} pool${removedPools == 1 ? '' : 's'} (total traders left: ${formatNumber(Object.keys(this.traders).length)}).`], WEIGHT);
         }
+
+        conclude();
     }
 
     /**
@@ -242,13 +286,15 @@ export class MainEngine {
 
         scores.sort((a, b) => b.totalPnL - a.totalPnL); // descending
 
-        Log.flow([SLUG, `Leaderboard`, `Top ${limit} traders:`, scores.slice(0, limit).map(t => `${t.address} (${formatNumber(t.totalPnL)})`).join(', ')], WEIGHT);
+        if (scores.length > 0) {
+            Log.flow([SLUG, `Leaderboard`, `Top ${limit} traders:`, scores.slice(0, limit).map(t => `${t.address} (${formatNumber(t.totalPnL)})`).join(', ')], WEIGHT);
+        }
 
         return scores.slice(0, limit);
     }
 
     static getTraderStats = (address: string) => {
-        if(MainEngine.traders[address]){
+        if (MainEngine.traders[address]) {
             const trader = MainEngine.traders[address];
             const totalRealized = Object.values(trader.pools).reduce((sum, p) => sum + p.realizedPnL, 0);
             const totalUnrealized = Object.values(trader.pools).reduce((sum, p) => sum + p.unrealizedPnL, 0);

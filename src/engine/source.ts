@@ -47,12 +47,30 @@ export class SourceEngine {
         }
     });
 
+    // private static getTopHolders = (mint: string) => new Promise<string[]>(async (resolve, reject) => {
+    //     try {
+    //         const holders: {
+    //             address: string;
+    //             amount: any;
+    //         }[] = (await axios.get(`${Site.PF_API}/coins/holders/${mint}`)).data.holders;
+    //         console.log(holders);
+    //         const addresses = holders.sort((a, b) => parseFloat(b.amount) - parseFloat(a.amount)).map(x => x.address);
+    //         // addresses.shift(); // REMOVE POSSIBLE BONDING ADDRESS
+    //         resolve(addresses.slice(0, Site.MAX_TOP_HOLDERS));
+    //     } catch (error) {
+    //         Log.dev(error);
+    //         resolve([]);
+    //     }
+    // });
+
     private static getTopHolders = (mint: string) => new Promise<string[]>(async (resolve, reject) => {
         try {
             const holders: {
                 address: string;
                 amount: any;
-            }[] = (await axios.get(`${Site.PF_API}/coins/holders/${mint}`)).data.holders;
+                solBalance: any;
+            }[] = (await axios.get(`https://advanced-api-v2.pump.fun/coins/top-holders-and-sol-balance/${mint}`)).data.topHolders;
+            // console.log(holders);
             const addresses = holders.sort((a, b) => parseFloat(b.amount) - parseFloat(a.amount)).map(x => x.address);
             // addresses.shift(); // REMOVE POSSIBLE BONDING ADDRESS
             resolve(addresses.slice(0, Site.MAX_TOP_HOLDERS));

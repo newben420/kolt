@@ -1,10 +1,12 @@
 import { getDateTime } from "../lib/date_time";
 import { Site } from "../site";
+import { MainEngine } from "./main";
 import PumpswapEngine from "./pumpswap";
 import { TelegramEngine } from "./telegram";
+import { TrackerEngine } from "./tracker";
 
 export const startEngine = () => new Promise<boolean>(async (resolve, reject) => {
-    const loaded = (await TelegramEngine.start()) && (await PumpswapEngine.start());
+    const loaded = (await TelegramEngine.start()) && (await PumpswapEngine.start()) && (await TrackerEngine.start()) && (await MainEngine.start());
     resolve(loaded);
 });
 

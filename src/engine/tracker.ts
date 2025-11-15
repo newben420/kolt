@@ -34,7 +34,7 @@ const WEIGHT = 3;
  * From the telegram interface, the user should be able to delete addresses added here.
  */
 export class TrackerEngine {
-    private static start = () => new Promise<boolean>((resolve, reject) => {
+    static start = () => new Promise<boolean>((resolve, reject) => {
         TrackerEngine.run();
         resolve(true);
     });
@@ -69,6 +69,7 @@ export class TrackerEngine {
                     upnl,
                     pnl,
                 };
+                return true;
             }
         }
         else {
@@ -76,6 +77,7 @@ export class TrackerEngine {
             if (pnl) TrackerEngine.traders[address].pnl = pnl;
             if (rpnl) TrackerEngine.traders[address].rpnl = rpnl;
             if (upnl) TrackerEngine.traders[address].upnl = upnl;
+            return false;
         }
         return true;
     }
@@ -99,12 +101,14 @@ export class TrackerEngine {
         newTokenBalance,
         marketCapSol,
         latencyMS,
+        poolAddr,
     }: {
         solAmount: number;
         tokenAmount: number;
         traderPublicKey: string;
         txType: "buy" | "sell";
         pool: string;
+        poolAddr: string;
         signature: string;
         priceSol: number;
         marketCapSol: number;
@@ -122,13 +126,13 @@ export class TrackerEngine {
                     let m = `${txType == 'buy' ? `🟩` : `🟥`} *${shortenAddress(traderPublicKey)}* ${txType == 'buy' ? `bought with` : `sold for`} SOL${FFF(solAmount)} at ${FFF(priceSol)}\n\n`;
                     m += `Buys ➡️ \`${formatNumber(trader.buys)}\` 🔄 Sells ⬅️ \`${trader.sells}\`\n`;
                     m += `Active since 🕝 \`${getTimeElapsed(trader.timeAdded, Date.now())}\`\n`;
-                    m += `Pool 📍 \`${pool}\`\n`;
+                    m += `Pool 📍 \`${poolAddr}\`\n`;
                     m += `Trader 👤 \`${traderPublicKey}\`\n`;
                     m += `Signature 📝 \`${signature}\`\n`;
                     m += `MarketcapSOL 📊 \`${FFF(marketCapSol)}\`\n`;
                     m += `Token Amount 🪙 \`${FFF(tokenAmount)}\`\n`;
                     m += `Token Balance 💰 \`${FFF(newTokenBalance)}\`\n`;
-                    if((stats.totalPnL || stats.unrealizedPnL || stats.realizedPnL) || (trader.pnl || trader.rpnl || trader.upnl)) m += `PnL \`${FFF(stats.totalPnL || trader.pnl || 0)}\` 💰U \`${FFF(stats.unrealizedPnL || trader.upnl || 0)}\` 💰R \`${FFF(stats.realizedPnL || trader.rpnl || 0)}\`\n`;
+                    if((stats.totalPnL || stats.unrealizedPnL || stats.realizedPnL) || (trader.pnl || trader.rpnl || trader.upnl)) m += `PnL \`${FFF((stats.totalPnL || trader.pnl || 0) * 100)}%\` 💰U \`${FFF((stats.unrealizedPnL || trader.upnl || 0) * 100)}%\` 💰R \`${FFF((stats.realizedPnL || trader.rpnl || 0) * 100)}%\`\n`;
 
                     (await TelegramEngine()).sendMessage(m, undefined, {
                         parse_mode: 'MarkdownV2',

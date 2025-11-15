@@ -126,6 +126,8 @@ export default class PumpswapEngine {
         return { ...d, ...o };
     };
 
+    static recentLatencies: number[] = [];
+
     private static sub = (topic: string, callback: (data: any) => void, force = false): Subscription | null => {
         if (!PumpswapEngine.nc) return null;
 
@@ -175,11 +177,20 @@ export default class PumpswapEngine {
                                 newTokenBalance: isBuy ? json.data.userBaseTokenReserves : json.data.userQuoteTokenReserves,
                                 priceSol: json.data.priceSol,
                                 marketCapSol: json.data.marketcapSol,
-                                latencyMS: json.latency
+                                latencyMS: json.latency,
+                                poolAddr: json.data.pool,
                             };
 
                             (await TrackerEngine()).newTrade(ppOBJ);
                             (await MainEngine()).newTrade(ppOBJ);
+
+                            PumpswapEngine.recentLatencies.push(parseInt(json.latency));
+
+                            const MAX_LAT_LENGTH = 10;
+                            if(PumpswapEngine.recentLatencies.length > MAX_LAT_LENGTH){
+                                PumpswapEngine.recentLatencies = PumpswapEngine.recentLatencies.slice(PumpswapEngine.recentLatencies.length - MAX_LAT_LENGTH);
+                            }
+
                             callback(ppOBJ);
                         } else {
                             Log.dev("Unknown event message");
