@@ -2,3 +2,4 @@
 node_modules
 analysis
 dist
+!.env.sample
