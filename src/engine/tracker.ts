@@ -88,7 +88,7 @@ export class TrackerEngine {
 
     static getAddressStartsWith = (pre: string) => Object.keys(TrackerEngine.traders).find(addr => addr.startsWith(pre)) || null;
 
-    static getTradersArray = () => Object.entries(TrackerEngine.traders).map(([address, trader]) => ({...trader, address})).sort((a, b) => a.timeAdded - b.timeAdded);
+    static getTradersArray = () => Object.entries(TrackerEngine.traders).map(([address, trader]) => ({ ...trader, address })).sort((a, b) => a.timeAdded - b.timeAdded);
 
 
     static getTopTradersCount = () => Object.entries(TrackerEngine.traders).map(([address, trader]) => trader).filter(tr => !tr.manuallyAdded).length;
@@ -110,42 +110,42 @@ export class TrackerEngine {
     }: PPOBJ) => {
         if (TrackerEngine.traderExists(traderPublicKey)) {
             const trader = TrackerEngine.getTrader(traderPublicKey);
+            trader.lastUpdated = Date.now();
+            if (txType == "buy") {
+                trader.buys += 1;
+                trader.buysSol += solAmount;
+            }
+            if (txType == "sell") {
+                trader.sells += 1;
+                trader.sellsSol += solAmount;
+            }
+
             if (trader.showAlert) {
+                let m = `${txType == 'buy' ? `🟩` : `🟥`} *${shortenAddress(traderPublicKey)}* ${txType == 'buy' ? `bought with` : `sold for`} SOL${FFF(solAmount)} at ${FFF(priceSol)}\n\n`;
+                m += `Buys ➡️ \`${formatNumber(trader.buys)}\` \\(SOL${FFF(trader.buysSol)}\\) 🔄 Sells ⬅️ \`${trader.sells}\` \\(SOL${FFF(trader.sellsSol)}\\)\n`;
+                m += `Active since 🕝 \`${getTimeElapsed(trader.timeAdded, Date.now())}\`\n`;
+                m += `Mint 📍 \`${mint}\`\n`;
+                m += `Trader 👤 \`${traderPublicKey}\`\n`;
+                // m += `Signature 📝 \`${signature}\`\n`;
+                m += `MarketcapSOL 📊 \`${FFF(marketCapSol)}\`\n`;
+                m += `Token Amount 🪙 \`${FFF(tokenAmount)}\`\n`;
                 const stats = (await MainEngine()).getTraderStats(traderPublicKey);
                 if (stats) {
-                    trader.lastUpdated = Date.now();
-                    if (txType == "buy") {
-                        trader.buys += 1;
-                        trader.buysSol += solAmount;
-                    }
-                    if (txType == "sell") {
-                        trader.sells += 1;
-                        trader.sellsSol += solAmount;
-                    }
-                    let m = `${txType == 'buy' ? `🟩` : `🟥`} *${shortenAddress(traderPublicKey)}* ${txType == 'buy' ? `bought with` : `sold for`} SOL${FFF(solAmount)} at ${FFF(priceSol)}\n\n`;
-                    m += `Buys ➡️ \`${formatNumber(trader.buys)}\` \\(SOL${FFF(trader.buysSol)}\\) 🔄 Sells ⬅️ \`${trader.sells}\` \\(SOL${FFF(trader.sellsSol)}\\)\n`;
-                    m += `Active since 🕝 \`${getTimeElapsed(trader.timeAdded, Date.now())}\`\n`;
-                    m += `Mint 📍 \`${mint}\`\n`;
-                    m += `Trader 👤 \`${traderPublicKey}\`\n`;
-                    // m += `Signature 📝 \`${signature}\`\n`;
-                    m += `MarketcapSOL 📊 \`${FFF(marketCapSol)}\`\n`;
-                    m += `Token Amount 🪙 \`${FFF(tokenAmount)}\`\n`;
-                    if((stats.totalPnL || stats.unrealizedPnL || stats.realizedPnL) || (trader.pnl || trader.rpnl || trader.upnl)) m += `PnL \`${FFF((stats.totalPnL || trader.pnl || 0) * 100)}%\` 💰U \`${FFF((stats.unrealizedPnL || trader.upnl || 0) * 100)}%\` 💰R \`${FFF((stats.realizedPnL || trader.rpnl || 0) * 100)}%\`\n`;
-
-                    (await TelegramEngine()).sendMessage(m, undefined, {
-                        parse_mode: 'MarkdownV2',
-                        reply_markup: {
-                            inline_keyboard: [
-                                [
-                                    {
-                                        text: "🗑 Message",
-                                        callback_data: 'deletemessage',
-                                    }
-                                ]
-                            ]
-                        }
-                    }, undefined);
+                    if ((stats.totalPnL || stats.unrealizedPnL || stats.realizedPnL) || (trader.pnl || trader.rpnl || trader.upnl)) m += `PnL \`${FFF((stats.totalPnL || trader.pnl || 0) * 100)}%\` 💰U \`${FFF((stats.unrealizedPnL || trader.upnl || 0) * 100)}%\` 💰R \`${FFF((stats.realizedPnL || trader.rpnl || 0) * 100)}%\`\n`;
                 }
+                (await TelegramEngine()).sendMessage(m, undefined, {
+                    parse_mode: 'MarkdownV2',
+                    reply_markup: {
+                        inline_keyboard: [
+                            [
+                                {
+                                    text: "🗑 Message",
+                                    callback_data: 'deletemessage',
+                                }
+                            ]
+                        ]
+                    }
+                }, undefined);
             }
         }
     }
