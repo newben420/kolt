@@ -1,3 +1,4 @@
+import { PPOBJ } from './../model/ppobj';
 import { formatNumber, FFF } from './../lib/format_number';
 import { shortenAddress } from './../lib/shorten_address';
 import { TrackedTraderAddress, TrackedTraderObject } from './../model/tracker';
@@ -62,12 +63,15 @@ export class TrackerEngine {
                 TrackerEngine.traders[address] = {
                     buys: 0,
                     sells: 0,
+                    buysSol: 0,
+                    sellsSol: 0,
                     lastUpdated: now,
                     timeAdded: now,
                     manuallyAdded: manual,
                     rpnl,
                     upnl,
                     pnl,
+                    showAlert: Site.TR_SEND_ACTIVITY,
                 };
                 return true;
             }
@@ -90,6 +94,7 @@ export class TrackerEngine {
     static getTopTradersCount = () => Object.entries(TrackerEngine.traders).map(([address, trader]) => trader).filter(tr => !tr.manuallyAdded).length;
     static getManualTradersCount = () => Object.entries(TrackerEngine.traders).map(([address, trader]) => trader).filter(tr => tr.manuallyAdded).length;
 
+
     static newTrade = async ({
         solAmount,
         tokenAmount,
@@ -98,40 +103,33 @@ export class TrackerEngine {
         pool,
         priceSol,
         signature,
-        newTokenBalance,
         marketCapSol,
         latencyMS,
-        poolAddr,
-    }: {
-        solAmount: number;
-        tokenAmount: number;
-        traderPublicKey: string;
-        txType: "buy" | "sell";
-        pool: string;
-        poolAddr: string;
-        signature: string;
-        priceSol: number;
-        marketCapSol: number;
-        latencyMS: number;
-        newTokenBalance: number;
-    }) => {
+        mint,
+        poolAddress,
+    }: PPOBJ) => {
         if (TrackerEngine.traderExists(traderPublicKey)) {
             const trader = TrackerEngine.getTrader(traderPublicKey);
-            if (Site.TR_SEND_ACTIVITY) {
+            if (trader.showAlert) {
                 const stats = (await MainEngine()).getTraderStats(traderPublicKey);
                 if (stats) {
                     trader.lastUpdated = Date.now();
-                    if (txType == "buy") trader.buys = trader.buys + 1;
-                    if (txType == "sell") trader.sells = trader.sells + 1;
+                    if (txType == "buy") {
+                        trader.buys += 1;
+                        trader.buysSol += solAmount;
+                    }
+                    if (txType == "sell") {
+                        trader.sells += 1;
+                        trader.sellsSol += solAmount;
+                    }
                     let m = `${txType == 'buy' ? `🟩` : `🟥`} *${shortenAddress(traderPublicKey)}* ${txType == 'buy' ? `bought with` : `sold for`} SOL${FFF(solAmount)} at ${FFF(priceSol)}\n\n`;
-                    m += `Buys ➡️ \`${formatNumber(trader.buys)}\` 🔄 Sells ⬅️ \`${trader.sells}\`\n`;
+                    m += `Buys ➡️ \`${formatNumber(trader.buys)}\` \\(SOL${FFF(trader.buysSol)}\\) 🔄 Sells ⬅️ \`${trader.sells}\` \\(SOL${FFF(trader.sellsSol)}\\)\n`;
                     m += `Active since 🕝 \`${getTimeElapsed(trader.timeAdded, Date.now())}\`\n`;
-                    m += `Pool 📍 \`${poolAddr}\`\n`;
+                    m += `Mint 📍 \`${mint}\`\n`;
                     m += `Trader 👤 \`${traderPublicKey}\`\n`;
-                    m += `Signature 📝 \`${signature}\`\n`;
+                    // m += `Signature 📝 \`${signature}\`\n`;
                     m += `MarketcapSOL 📊 \`${FFF(marketCapSol)}\`\n`;
                     m += `Token Amount 🪙 \`${FFF(tokenAmount)}\`\n`;
-                    m += `Token Balance 💰 \`${FFF(newTokenBalance)}\`\n`;
                     if((stats.totalPnL || stats.unrealizedPnL || stats.realizedPnL) || (trader.pnl || trader.rpnl || trader.upnl)) m += `PnL \`${FFF((stats.totalPnL || trader.pnl || 0) * 100)}%\` 💰U \`${FFF((stats.unrealizedPnL || trader.upnl || 0) * 100)}%\` 💰R \`${FFF((stats.realizedPnL || trader.rpnl || 0) * 100)}%\`\n`;
 
                     (await TelegramEngine()).sendMessage(m, undefined, {
@@ -193,11 +191,11 @@ export class TrackerEngine {
         })).filter(tr => tr.added);
 
         if (addedTraders.length > 0) {
-            Log.flow([SLUG, `Iteration`, `Automatically added top traders (count: ${addedTraders.length}).`], WEIGHT);
+            Log.flow([SLUG, `Iteration`, `Added top traders (count: ${addedTraders.length}).`], WEIGHT);
             if (Site.TR_SEND_AUTO_ADD) {
                 const l = addedTraders.length;
-                let m = `✅ *Automatically Added ${l} Top Trader${l == 1 ? '' : 's'}*\n\n`
-                m += `\`\`\`\n${addedTraders.map((tr, i) => `${(i + 1)}. ${shortenAddress(tr.address)} (${formatNumber(tr.totalPnL)})`).join('\n')}\`\`\``;
+                let m = `✅ *Added ${l} Top Trader${l == 1 ? '' : 's'}*\n\n`
+                m += `\`\`\`\n${addedTraders.map((tr, i) => `${(i + 1)}. ${shortenAddress(tr.address)} (${FFF(tr.totalPnL * 100)}%)`).join('\n')}\`\`\``;
                 (await TelegramEngine()).sendMessage(m);
             }
         }
@@ -212,9 +210,9 @@ export class TrackerEngine {
 
         if (walletsRemoved.length > 0) {
             const l = walletsRemoved.length;
-            Log.flow([SLUG, `Iteration`, `Automatically removed traders (count: ${l}).`], WEIGHT);
+            Log.flow([SLUG, `Iteration`, `Removed traders (count: ${l}).`], WEIGHT);
             if (Site.TR_SEND_AUTO_REM) {
-                let m = `❌ *Automatically Removed ${l} Trader${l == 1 ? '' : 's'}*\n\n`
+                let m = `❌ *Removed ${l} Top Trader${l == 1 ? '' : 's'}*\n\n`
                 m += `\`\`\`\n${walletsRemoved.map((tr, i) => `${(i + 1)}. ${shortenAddress(tr.addr)} (${getTimeElapsed(tr.lastUpdated, Date.now())})`).join('\n')}\`\`\``;
                 (await TelegramEngine()).sendMessage(m);
             }

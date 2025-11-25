@@ -1,3 +1,4 @@
+import { PPOBJ } from './../model/ppobj';
 import { Site } from "./../site";
 import { connect, NatsConnection, StringCodec, Subscription } from "nats.ws";
 import { Log } from "./../lib/log";
@@ -126,9 +127,46 @@ export default class PumpswapEngine {
         return { ...d, ...o };
     };
 
+    private static newParseMessage = (d: Record<string, any>): Record<string, any> => {
+        const floatFields = [
+            // common
+            "marketCap",
+            "baseAmount",
+            "quoteAmount",
+            "protocolFee",
+            "protocolFeeUsd",
+            "priceBasePerQuote",
+            "priceQuotePerBase",
+            "priceUsd",
+            "priceSol",
+            "amountSol",
+            "amountUsd",
+            "creatorFee",
+            "creatorFeeUsd",
+            "baseReserves",
+            "quoteReserves",
+            "solPriceUsd",
+            // pump extra
+            "virtualSolReserves",
+            "virtualTokenReserves",
+            // amm extra
+            "lpFee",
+            "lpFeeUsd",
+        ];
+
+        const o: Record<string, number> = {};
+        for (const key of floatFields) {
+            if (d[key] !== undefined) {
+                o[key] = parseFloat(d[key]) || 0;
+                delete d[key];
+            }
+        }
+        return { ...d, ...o };
+    };
+
     static recentLatencies: number[] = [];
 
-    private static sub = (topic: string, callback: (data: any) => void, force = false): Subscription | null => {
+    private static sub = (topic: string, callback: (data: PPOBJ) => void, force = false): Subscription | null => {
         if (!PumpswapEngine.nc) return null;
 
         if (PumpswapEngine.subscriptions.has(topic) && !force) {
@@ -145,52 +183,45 @@ export default class PumpswapEngine {
                 try {
                     const json = JSON.parse(JSON.parse(decoded));
                     PumpswapEngine.messageCount += 1;
-                    if (json.data && json.data.user && (PumpswapEngine.traders.includes(json.data.user as string) || (await TrackerEngine()).traderExists(json.data.user as string))) {
+                    if (json.userAddress && (PumpswapEngine.traders.includes(json.userAddress as string) || (await TrackerEngine()).traderExists(json.userAddress as string))) {
                         PumpswapEngine.validMessageCount += 1;
-                        if (json.name && ["buyevent", "sellevent"].includes(json.name.toLowerCase())) {
-                            const data = PumpswapEngine.parseMessage(json.data);
-                            json.data = data;
+                        if (json.type && ["buy", "sell"].includes(json.type.toLowerCase())) {
+                            const data = PumpswapEngine.newParseMessage(json);
+                            if(data.timestamp){
+                                try {
+                                    data.timestamp = (new Date(data.timestamp)).getTime();
+                                    data.latency = Date.now() - data.timestamp;
+                                } catch (error) {
+                                    data.timestamp = Date.now();
+                                    data.latency = 0;
+                                }
+                            }
 
-                            if (json.index) json.index = parseHexFloat(json.index) || 0;
-                            if (json.slot) json.slot = parseHexFloat(json.slot) || 0;
-                            if (json.data.timestamp) json.data.timestamp *= 1000;
-                            if (json.receivedAt && json.data.timestamp)
-                                json.latency = Math.abs(json.receivedAt - json.data.timestamp);
+                            data.marketcapSol = (data.marketCap / data.solPriceUsd) || data.marketCap || 0;
 
-                            const baseDec = 10 ** 6;
-                            const quoteDec = 10 ** 9;
-                            const baseRes = Number(json.data.poolBaseTokenReserves) / baseDec;
-                            const quoteRes = Number(json.data.poolQuoteTokenReserves) / quoteDec;
-
-                            json.data.priceSol = quoteRes / baseRes;
-
-                            json.data.marketcapSol = json.data.priceSol * Site.PS_PF_TOTAL_SUPPLY / 10 ** 6;
-
-                            const isBuy = (json.name || '').toLowerCase().includes('buy');
-                            const ppOBJ: any = {
-                                solAmount: (isBuy ? json.data.quoteAmountIn : json.data.quoteAmountOut) / quoteDec,
-                                tokenAmount: (isBuy ? json.data.baseAmountOut : json.data.baseAmountIn) / baseDec,
-                                traderPublicKey: json.data.user,
-                                txType: isBuy ? 'buy' : 'sell',
-                                signature: json.tx,
-                                pool: "pump-amm",
-                                newTokenBalance: isBuy ? json.data.userBaseTokenReserves : json.data.userQuoteTokenReserves,
-                                priceSol: json.data.priceSol,
-                                marketCapSol: json.data.marketcapSol,
-                                latencyMS: json.latency,
-                                poolAddr: json.data.pool,
+                            const ppOBJ: PPOBJ = {
+                                solAmount: data.quoteAmount,
+                                tokenAmount: data.baseAmount,
+                                traderPublicKey: data.userAddress,
+                                txType: (data.type as string).toLowerCase() as "buy" | "sell",
+                                signature: data.tx,
+                                pool: data.program,
+                                priceSol: data.priceSol,
+                                marketCapSol: data.marketcapSol,
+                                latencyMS: data.latency,
+                                mint: data.mintAddress,
+                                poolAddress: data.poolAddress,
                             };
 
                             (await TrackerEngine()).newTrade(ppOBJ);
                             (await MainEngine()).newTrade(ppOBJ);
 
-                            PumpswapEngine.recentLatencies.push(parseInt(json.latency));
+                            PumpswapEngine.recentLatencies.push(ppOBJ.latencyMS);
 
                             const MAX_LAT_LENGTH = 10;
-                            if(PumpswapEngine.recentLatencies.length > MAX_LAT_LENGTH){
+                            if (PumpswapEngine.recentLatencies.length > MAX_LAT_LENGTH) {
                                 PumpswapEngine.recentLatencies = PumpswapEngine.recentLatencies.slice(PumpswapEngine.recentLatencies.length - MAX_LAT_LENGTH);
                             }
-
                             callback(ppOBJ);
                         } else {
                             Log.dev("Unknown event message");
@@ -275,12 +306,12 @@ export default class PumpswapEngine {
 
     private static connectorChecker = () => {
         if (PumpswapEngine.traders.length > 0) {
-            PumpswapEngine.sub(`ammTradeEvent.>`, data => {
+            PumpswapEngine.sub(`unifiedTradeEvent.processed.>`, data => {
             });
             PumpswapEngine.subscribed = true;
         }
         else {
-            PumpswapEngine.unsub(`ammTradeEvent.>`);
+            PumpswapEngine.unsub(`unifiedTradeEvent.processed.>`);
             PumpswapEngine.subscribed = false;
         }
     }

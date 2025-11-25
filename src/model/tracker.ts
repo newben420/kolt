@@ -6,9 +6,12 @@ export interface TrackedTrader {
     sells: number;
     manuallyAdded: boolean;
     buys: number;
+    buysSol: number;
+    sellsSol: number;
     pnl?: number;
     upnl?: number;
     rpnl?: number;
+    showAlert: boolean;
 }
 
 export type TrackedTraderAddress = string;

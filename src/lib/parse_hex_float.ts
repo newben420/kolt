@@ -1,17 +1,27 @@
-/**
- * Parse a hexadecimal float string (e.g. "A.F") into a number.
- */
 export function parseHexFloat(hex: string): number {
-    if (!hex.includes(".")) return parseInt(hex, 16);
+    if (!hex) return 0;
 
-    const [intPart, fracPart] = hex.split(".");
-    const intVal = parseInt(intPart, 16);
-    let fracVal = 0;
-
-    for (let i = 0; i < fracPart.length; i++) {
-        const digit = parseInt(fracPart[i], 16);
-        fracVal += digit / Math.pow(16, i + 1);
+    let negative = false;
+    if (hex.startsWith("-")) {
+        negative = true;
+        hex = hex.slice(1);
     }
 
-    return intVal + fracVal;
+    hex = hex.replace(/^0x/i, "");
+
+    if (!hex.includes(".")) return negative ? -parseInt(hex, 16) : parseInt(hex, 16);
+
+    const [intPart, fracPart] = hex.split(".");
+    const intVal = intPart ? parseInt(intPart, 16) : 0;
+
+    let fracVal = 0;
+    if (fracPart) {
+        for (let i = 0; i < fracPart.length; i++) {
+            const digit = parseInt(fracPart[i], 16);
+            fracVal += digit / Math.pow(16, i + 1);
+        }
+    }
+
+    const result = intVal + fracVal;
+    return negative ? -result : result;
 }

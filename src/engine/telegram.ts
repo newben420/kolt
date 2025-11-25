@@ -128,16 +128,19 @@ export class TelegramEngine {
         }
         else {
             message += traders.map((trader, i) => {
-                let m = `${i + 1}. *${shortenAddress(trader.address)}*\n`;
-                m += `🚀 ${trader.manuallyAdded ? `Manual` : `Top Trader`}\n`;
+                let m = `${i + 1}. *${shortenAddress(trader.address)}* ${trader.manuallyAdded ? `⌨️` : `🤖`}\n`;
                 m += `🕝 ${getTimeElapsed(trader.timeAdded, Date.now())} 🔄 ${getTimeElapsed(trader.lastUpdated, Date.now())}\n`;
-                m += `🟩 ${formatNumber(trader.buys)} 🟥 ${formatNumber(trader.sells)}\n`
+                m += `🟩 ${formatNumber(trader.buys)} \\(SOL${FFF(trader.buysSol)}\\) 🟥 ${formatNumber(trader.sells)} \\(SOL${FFF(trader.sellsSol)}\\)\n`
                 if (trader.pnl || trader.rpnl || trader.upnl) m += `💰 ${FFF((trader.pnl || 0) * 100)}% 💰U ${FFF((trader.upnl || 0) * 100)}% 💰R ${FFF((trader.rpnl || 0) * 100)}%\n`;
                 inline.push([
                     {
                         text: `🗑 ${shortenAddress(trader.address)}`,
                         callback_data: `delt_${trader.address.slice(0, 6)}`,
-                    }
+                    },
+                    {
+                        text: trader.showAlert ? `🔕` : `🔔`,
+                        callback_data: `alrt_${trader.address.slice(0, 6)}_${trader.showAlert ? 'false' : 'true'}`,
+                    },
                 ]);
                 return m;
             }).join("\n");
@@ -280,7 +283,6 @@ export class TelegramEngine {
                         content = content.replace(/\-/g, ".").trim().replace(/_/g, " ").trim();
                         if (content.startsWith("delt ")) {
                             let temp = content.split(" ");
-                            let value = (temp[1] || '').toLowerCase() == "true";
                             let pre = temp[1] || '_________';
                             const addr = (await TrackerEngine()).getAddressStartsWith(pre);
                             if (addr) {
@@ -308,6 +310,46 @@ export class TelegramEngine {
                                 else {
                                     TelegramEngine.bot.answerCallbackQuery(callbackQuery.id, {
                                         text: `❌ Wallet could not be removed!`,
+                                    });
+                                }
+                            }
+                            else {
+                                TelegramEngine.bot.answerCallbackQuery(callbackQuery.id, {
+                                    text: `❌ Wallet not found!`,
+                                });
+                            }
+                        }
+                        else if (content.startsWith("alrt ")) {
+                            let temp = content.split(" ");
+                            let value = (temp[2] || '').toLowerCase() == "true";
+                            let pre = temp[1] || '_________';
+                            const addr = (await TrackerEngine()).getAddressStartsWith(pre);
+                            if (addr) {
+                                const tracked = (await TrackerEngine()).getTrader(addr);
+                                if (tracked) {
+                                    tracked.showAlert = value;
+                                    TelegramEngine.bot.answerCallbackQuery(callbackQuery.id, {
+                                        text: `✅ Alert Updated to '${value ? 'Show' : 'Hide'}' for ${shortenAddress(addr)}!`,
+                                    });
+
+                                    try {
+                                        const { message, inline } = await TelegramEngine.trackerMessage();
+                                        const done = await TelegramEngine.bot.editMessageText(TelegramEngine.sanitizeMessage(message), {
+                                            chat_id: Site.TG_CHAT_ID,
+                                            message_id: callbackQuery?.message?.message_id,
+                                            parse_mode: "MarkdownV2",
+                                            disable_web_page_preview: true,
+                                            reply_markup: {
+                                                inline_keyboard: inline
+                                            }
+                                        });
+                                    } catch (error) {
+                                        Log.dev(error);
+                                    }
+                                }
+                                else {
+                                    TelegramEngine.bot.answerCallbackQuery(callbackQuery.id, {
+                                        text: `❌ Alert not updated!`,
                                     });
                                 }
                             }

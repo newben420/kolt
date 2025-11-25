@@ -1,3 +1,4 @@
+import { PPOBJ } from './../model/ppobj';
 import { Site } from './../site';
 import { formatNumber } from './../lib/format_number';
 import { Log } from './../lib/log';
@@ -77,25 +78,16 @@ export class MainEngine {
         traderPublicKey,
         txType,
         pool,
-        poolAddr,
         priceSol,
-        newTokenBalance,
-    }: {
-        solAmount: number;
-        tokenAmount: number;
-        traderPublicKey: string;
-        txType: "buy" | "sell";
-        pool: string;
-        signature: string;
-        priceSol: number;
-        marketCapSol: number;
-        latencyMS: number;
-        poolAddr: string;
-        newTokenBalance: number;
-    }) => {
+        latencyMS,
+        marketCapSol,
+        mint,
+        poolAddress,
+        signature
+    }: PPOBJ) => {
         if (MainEngine.traders[traderPublicKey]) {
             const trader = MainEngine.newTrader(traderPublicKey);
-            const traderPool = MainEngine.getOrCreatePool(trader, poolAddr);
+            const traderPool = MainEngine.getOrCreatePool(trader, mint);
 
             trader.lastActive = Date.now();
             traderPool.lastActive = Date.now();
@@ -109,12 +101,8 @@ export class MainEngine {
                     timestamp: Date.now(),
                 });
                 traderPool.totalBuys += solAmount;
-                if (newTokenBalance) {
-                    traderPool.currentHoldings = newTokenBalance;
-                }
-                else {
-                    traderPool.currentHoldings += tokenAmount;
-                }
+
+                traderPool.currentHoldings += tokenAmount;
             } else if (txType === "sell") {
                 let remainingToSell = tokenAmount;
                 const sellPrice = solAmount / tokenAmount;
@@ -204,7 +192,7 @@ export class MainEngine {
                 Log.flow([SLUG, `GC`, `Running again in ${getTimeElapsed(0, remaining)}.`], WEIGHT);
             }
         }
-        
+
         Log.flow([SLUG, `GC`, `Initialized.`], WEIGHT);
         let removedPools = 0;
         let removedTraders = 0;
