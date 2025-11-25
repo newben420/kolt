@@ -180,6 +180,25 @@ export class TrackerEngine {
         }
         Log.flow([SLUG, `Iteration`, `Initialized.`], WEIGHT);
 
+        // Removing Traders (Garbage Collection)
+        const walletsRemoved = Object.keys(TrackerEngine.traders).
+            map(addr => ({ ...TrackerEngine.traders[addr], addr })).
+            filter(tr => !tr.manuallyAdded).
+            filter(tr => (Date.now() - (tr.lastUpdated || 0)) >= Site.TR_INACTIVITY_TIMEOUT_MS).
+            map(tr => ({ ...tr, removed: TrackerEngine.removeTrader(tr.addr) })).
+            filter(tr => tr.removed);
+
+        if (walletsRemoved.length > 0) {
+            const l = walletsRemoved.length;
+            Log.flow([SLUG, `Iteration`, `Removed traders (count: ${l}).`], WEIGHT);
+            if (Site.TR_SEND_AUTO_REM) {
+                let m = `❌ *Removed ${l} Top Trader${l == 1 ? '' : 's'}*\n\n`
+                m += `\`\`\`\n${walletsRemoved.map((tr, i) => `${(i + 1)}. ${shortenAddress(tr.addr)} (${getTimeElapsed(tr.lastUpdated, Date.now())})`).join('\n')}\`\`\``;
+                (await TelegramEngine()).sendMessage(m);
+            }
+
+        }
+
         // Adding Top Traders
         const addedTraders = (await MainEngine()).getTopTraders(Site.TR_MAX_TRADERS).map(tr => ({
             ...tr,
@@ -200,24 +219,6 @@ export class TrackerEngine {
             }
         }
 
-        // Removing Traders (Garbage Collection)
-        const walletsRemoved = Object.keys(TrackerEngine.traders).
-            map(addr => ({ ...TrackerEngine.traders[addr], addr })).
-            filter(tr => !tr.manuallyAdded).
-            filter(tr => (Date.now() - (tr.lastUpdated || 0)) >= Site.TR_INACTIVITY_TIMEOUT_MS).
-            map(tr => ({ ...tr, removed: TrackerEngine.removeTrader(tr.addr) })).
-            filter(tr => tr.removed);
-
-        if (walletsRemoved.length > 0) {
-            const l = walletsRemoved.length;
-            Log.flow([SLUG, `Iteration`, `Removed traders (count: ${l}).`], WEIGHT);
-            if (Site.TR_SEND_AUTO_REM) {
-                let m = `❌ *Removed ${l} Top Trader${l == 1 ? '' : 's'}*\n\n`
-                m += `\`\`\`\n${walletsRemoved.map((tr, i) => `${(i + 1)}. ${shortenAddress(tr.addr)} (${getTimeElapsed(tr.lastUpdated, Date.now())})`).join('\n')}\`\`\``;
-                (await TelegramEngine()).sendMessage(m);
-            }
-
-        }
         conclude();
     }
 }
