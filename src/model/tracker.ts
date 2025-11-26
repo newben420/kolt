@@ -12,6 +12,7 @@ export interface TrackedTrader {
     upnl?: number;
     rpnl?: number;
     showAlert: boolean;
+    copy: boolean;
 }
 
 export type TrackedTraderAddress = string;

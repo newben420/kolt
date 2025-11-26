@@ -14,6 +14,7 @@ import { WebSocket } from 'ws';
 import { JSONSafeParse } from './lib/json_safe_parse';
 import PumpswapEngine from './engine/pumpswap';
 import { SourceEngine } from './engine/source';
+import { PoolEngine } from './engine/pool';
 
 const app = express();
 const server = http.createServer(app);

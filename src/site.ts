@@ -1,5 +1,5 @@
 import { config } from "dotenv";
-import {Keypair} from "@solana/web3.js";
+import { Keypair } from "@solana/web3.js";
 import { JSONSafeParse } from "./lib/json_safe_parse";
 const args = process.argv.slice(2);
 config({
@@ -49,11 +49,41 @@ export class Site {
     static MN_MEMORY_CAP: number = parseInt(process.env['MN_MEMORY_CAP'] || "0") || 5000;
     static MN_INACTIVITY_TIMEOUT_MS: number = parseInt(process.env['MN_INACTIVITY_TIMEOUT_MS'] || "0") || 1800000;
     static MN_GARBAGE_INTERVAL_MS: number = parseInt(process.env['MN_GARBAGE_INTERVAL_MS'] || "0") || 180000;
-    
+
     static TR_INTERVAL_MS: number = parseInt(process.env['TR_INTERVAL_MS'] || "0") || 180000;
     static TR_MAX_TRADERS: number = parseInt(process.env['TR_MAX_TRADERS'] || "0") || 30;
     static TR_SEND_AUTO_ADD: boolean = (process.env['TR_SEND_AUTO_ADD'] || '').toLowerCase() == "true";
     static TR_SEND_AUTO_REM: boolean = (process.env['TR_SEND_AUTO_REM'] || '').toLowerCase() == "true";
     static TR_SEND_ACTIVITY: boolean = (process.env['TR_SEND_ACTIVITY'] || '').toLowerCase() == "true";
     static TR_INACTIVITY_TIMEOUT_MS: number = parseInt(process.env['TR_INACTIVITY_TIMEOUT_MS'] || "0") || 1800000;
+
+    static CP_SIMULATION: boolean = (process.env['CP_SIMULATION'] || '').toLowerCase() == "true";
+    static CP_MIN_COPY_SOL: number = parseFloat(process.env['CP_MIN_COPY_SOL'] || '0') || 0;
+    static CP_CAPITAL_SOL: number = parseFloat(process.env['CP_CAPITAL_SOL'] || '0') || 0;
+    static CP_BUY_SLIPPAGE_PERC: number = parseFloat(process.env['CP_BUY_SLIPPAGE_PERC'] || '0') || 0;
+    static CP_SELL_SLIPPAGE_PERC: number = parseFloat(process.env['CP_SELL_SLIPPAGE_PERC'] || '0') || 0;
+    static CP_SKIP_PREFLIGHT: boolean = (process.env['CP_SKIP_PREFLIGHT'] || '').toLowerCase() == "true";
+    static CP_EXIT_CONFIG = (process.env.CP_EXIT_CONFIG || '')
+        .toLowerCase()
+        .split('|')
+        .map(c =>
+            c.split(" ").filter(x => x.length > 0)
+        )
+        .filter(c =>
+            c.length == 3 &&
+            (!Number.isNaN(parseFloat(c[0]))) &&
+            parseFloat(c[0]) > 0 &&
+            parseFloat(c[0]) <= 100 &&
+            (!Number.isNaN(parseFloat(c[2]))) &&
+            parseFloat(c[2]) >= -100 &&
+            (!!parseFloat(c[2])) &&
+            (['true', 'false'].indexOf(c[1]) != -1)
+        )
+        .map(c => ({
+            sellPercentage: parseInt(c[0]),
+            triggerByCopy: c[1] == "true",
+            triggerValue: parseFloat(c[2]),
+        }));
+    static CP_FEES_PER_TRADE_SOL: number = parseFloat(process.env['CP_FEES_PER_TRADE_SOL'] || '0') || 0.000005;
+    static CP_MAX_CONCURRENT_POSITIONS: number = parseInt(process.env['CP_MAX_CONCURRENT_POSITIONS'] || '0') || 10;
 }

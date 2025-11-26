@@ -31,6 +31,8 @@ export class SourceEngine {
 
     private static conn = new Connection(Site.RPC, "confirmed");
 
+    static getConnection = () => SourceEngine.conn;
+
     private static getAccountOwners = (accounts: string[]) => new Promise<string[]>(async (resolve, reject) => {
         try {
             const pubKeys = accounts.map(addr => new PublicKey(addr));

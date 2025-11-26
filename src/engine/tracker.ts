@@ -22,6 +22,14 @@ const TelegramEngine = async () => {
     return cachedTelegramEngine;
 }
 
+let cachedCopyEngine: typeof import('./copy').CopyEngine | null = null;
+const CopyEngine = async () => {
+    if (!cachedCopyEngine) {
+        cachedCopyEngine = ((await import('./copy'))).CopyEngine;
+    }
+    return cachedCopyEngine;
+}
+
 const SLUG = "TrackerEngine";
 const WEIGHT = 3;
 
@@ -72,6 +80,7 @@ export class TrackerEngine {
                     upnl,
                     pnl,
                     showAlert: Site.TR_SEND_ACTIVITY,
+                    copy: false,
                 };
                 return true;
             }
@@ -110,6 +119,10 @@ export class TrackerEngine {
     }: PPOBJ) => {
         if (TrackerEngine.traderExists(traderPublicKey)) {
             const trader = TrackerEngine.getTrader(traderPublicKey);
+            if(trader.copy){
+                (await CopyEngine()).copyTrader(traderPublicKey, mint, solAmount, priceSol);
+            }
+
             trader.lastUpdated = Date.now();
             if (txType == "buy") {
                 trader.buys += 1;
@@ -119,6 +132,8 @@ export class TrackerEngine {
                 trader.sells += 1;
                 trader.sellsSol += solAmount;
             }
+
+            
 
             if (trader.showAlert) {
                 let m = `${txType == 'buy' ? `🟩` : `🟥`} *${shortenAddress(traderPublicKey)}* ${txType == 'buy' ? `bought with` : `sold for`} SOL${FFF(solAmount)} at ${FFF(priceSol)}\n\n`;

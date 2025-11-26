@@ -22,6 +22,14 @@ const TrackerEngine = async () => {
     return cachedTrackerEngine;
 }
 
+let cachedCopyEngine: typeof import('./copy').CopyEngine | null = null;
+const CopyEngine = async () => {
+    if (!cachedCopyEngine) {
+        cachedCopyEngine = ((await import('./copy'))).CopyEngine;
+    }
+    return cachedCopyEngine;
+}
+
 const MAX_RETRIES = Site.PS_MAX_RECON_RETRIES;
 let RETRIES = 0;
 const RETRY_INTERVAL = Site.PS_RETRIES_INTERVAL_MS;
@@ -183,11 +191,11 @@ export default class PumpswapEngine {
                 try {
                     const json = JSON.parse(JSON.parse(decoded));
                     PumpswapEngine.messageCount += 1;
-                    if (json.userAddress && (PumpswapEngine.traders.includes(json.userAddress as string) || (await TrackerEngine()).traderExists(json.userAddress as string))) {
+                    if (json.userAddress && ((Site.KEYPAIR.publicKey.toString() == json.userAddress) || PumpswapEngine.traders.includes(json.userAddress as string) || (await TrackerEngine()).traderExists(json.userAddress as string))) {
                         PumpswapEngine.validMessageCount += 1;
                         if (json.type && ["buy", "sell"].includes(json.type.toLowerCase())) {
                             const data = PumpswapEngine.newParseMessage(json);
-                            if(data.timestamp){
+                            if (data.timestamp) {
                                 try {
                                     data.timestamp = (new Date(data.timestamp)).getTime();
                                     data.latency = Date.now() - data.timestamp;
@@ -212,6 +220,12 @@ export default class PumpswapEngine {
                                 mint: data.mintAddress,
                                 poolAddress: data.poolAddress,
                             };
+
+                            
+                            (await CopyEngine()).otherTrade(ppOBJ);
+                            if (Site.KEYPAIR.publicKey.toString() == ppOBJ.traderPublicKey) {
+                                (await CopyEngine()).ownTrade(ppOBJ);
+                            }
 
                             (await TrackerEngine()).newTrade(ppOBJ);
                             (await MainEngine()).newTrade(ppOBJ);

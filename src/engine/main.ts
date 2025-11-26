@@ -5,6 +5,7 @@ import { Log } from './../lib/log';
 import { PoolAddress, Trader, TraderAddress, TraderObj, TraderPool } from "./../model/main";
 import PumpswapEngine from './pumpswap';
 import { getTimeElapsed } from './../lib/date_time';
+import { PoolEngine } from './pool';
 
 const SLUG = "MainEngine";
 
@@ -50,6 +51,18 @@ export class MainEngine {
                 tier: "C",
             };
             Log.flow([SLUG, `Add`, `${address}`, `Total: ${formatNumber(Object.keys(MainEngine.traders).length)}.`], WEIGHT);
+            // TODO
+            // PoolEngine.getPool({
+            //     walletAddress: address,
+            //     callback(pools) {
+            //         if(pools.length > 0 && MainEngine.traders[address]){
+            //             for(const p of pools){
+            //                 const traderPool = MainEngine.getOrCreatePool(MainEngine.traders[address], p.mint);
+            //                 traderPool.
+            //             }
+            //         }
+            //     },
+            // })
             PumpswapEngine.monitorTrader(address);
         }
         return MainEngine.traders[address];
@@ -250,6 +263,24 @@ export class MainEngine {
         }
 
         conclude();
+    }
+
+    static getPoolLotsNumber = (trader: string, mint: string) => {
+        if(MainEngine.traders[trader]){
+            if(MainEngine.traders[trader].pools[mint]){
+                return MainEngine.traders[trader].pools[mint].lots.length;
+            }
+        }
+        return 0;
+    }
+
+    static getPoolTotalBuys = (trader: string, mint: string) => {
+        if(MainEngine.traders[trader]){
+            if(MainEngine.traders[trader].pools[mint]){
+                return MainEngine.traders[trader].pools[mint].totalBuys;
+            }
+        }
+        return 0;
     }
 
     /**
