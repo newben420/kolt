@@ -15,6 +15,7 @@ export interface Position {
     solGotten: number;
     amountHeld: number;
     sellIndices: number[];
+    PDIndices: number[];
     sellReasons: string[];
     lastSellTS: number;
 }

@@ -239,15 +239,23 @@ export class TelegramEngine {
                 },
                 {
                     command: "/status",
-                    description: "Status"
+                    description: "Bot's Status"
                 },
                 {
                     command: "/tracker",
-                    description: "Tracker"
+                    description: "Managed Tracked Wallets"
                 },
                 {
                     command: "/positions",
-                    description: "Positions"
+                    description: "Manage Open Positions"
+                },
+                {
+                    command: "/balance",
+                    description: "Get Own Wallet Balance"
+                },
+                {
+                    command: "/recover",
+                    description: "Recover Rent, Close Empty Token Accounts"
                 },
             ]);
             if (!Site.TG_POLLING) {
@@ -273,6 +281,24 @@ export class TelegramEngine {
                                 inline_keyboard: inline,
                             }
                         });
+                    }
+                    else if (/^\/balance$/.test(content)) {
+                        const balance = await (await CopyEngine()).getOwnBalance();
+                        if(balance === null){
+                            TelegramEngine.sendMessage(`❌ Could not get wallet balance`);
+                        }
+                        else{
+                            TelegramEngine.sendMessage(`✅ *Wallet*\n\n📍 \`${Site.KEYPAIR.publicKey.toString()}\`\n💰\`SOL ${balance}\``);
+                        }
+                    }
+                    else if (/^\/recover$/.test(content)) {
+                        const done = await (await CopyEngine()).recovery();
+                        if(!done){
+                            TelegramEngine.sendMessage(`❌ Could not complete operation`);
+                        }
+                        else{
+                            TelegramEngine.sendMessage(`✅ Empty token accounts closed`);
+                        }
                     }
                     else if (/^\/positions$/.test(content)) {
                         const { inline, message } = await TelegramEngine.positionsMessage();

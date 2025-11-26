@@ -86,7 +86,7 @@ export class TrackerEngine {
             }
         }
         else {
-            TrackerEngine.traders[address].lastUpdated = now;
+            // TrackerEngine.traders[address].lastUpdated = now;
             if (pnl) TrackerEngine.traders[address].pnl = pnl;
             if (rpnl) TrackerEngine.traders[address].rpnl = rpnl;
             if (upnl) TrackerEngine.traders[address].upnl = upnl;
@@ -199,7 +199,7 @@ export class TrackerEngine {
         const walletsRemoved = Object.keys(TrackerEngine.traders).
             map(addr => ({ ...TrackerEngine.traders[addr], addr })).
             filter(tr => !tr.manuallyAdded).
-            filter(tr => (Date.now() - (tr.lastUpdated || 0)) >= Site.TR_INACTIVITY_TIMEOUT_MS).
+            filter(tr => (Date.now() - (tr.lastUpdated || 0)) >= Site.TR_INACTIVITY_TIMEOUT_MS && (!tr.copy)).
             map(tr => ({ ...tr, removed: TrackerEngine.removeTrader(tr.addr) })).
             filter(tr => tr.removed);
 

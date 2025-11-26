@@ -191,7 +191,7 @@ export default class PumpswapEngine {
                 try {
                     const json = JSON.parse(JSON.parse(decoded));
                     PumpswapEngine.messageCount += 1;
-                    if (json.userAddress && ((Site.KEYPAIR.publicKey.toString() == json.userAddress) || PumpswapEngine.traders.includes(json.userAddress as string) || (await TrackerEngine()).traderExists(json.userAddress as string))) {
+                    if (json.userAddress && json.mintAddress && ((Site.KEYPAIR.publicKey.toString() == json.userAddress) || ((await CopyEngine()).mintPresent(json.mintAddress)) || PumpswapEngine.traders.includes(json.userAddress as string) || (await TrackerEngine()).traderExists(json.userAddress as string))) {
                         PumpswapEngine.validMessageCount += 1;
                         if (json.type && ["buy", "sell"].includes(json.type.toLowerCase())) {
                             const data = PumpswapEngine.newParseMessage(json);

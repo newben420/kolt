@@ -86,4 +86,28 @@ export class Site {
         }));
     static CP_FEES_PER_TRADE_SOL: number = parseFloat(process.env['CP_FEES_PER_TRADE_SOL'] || '0') || 0.000005;
     static CP_MAX_CONCURRENT_POSITIONS: number = parseInt(process.env['CP_MAX_CONCURRENT_POSITIONS'] || '0') || 10;
+    static CP_PEAK_DROP_CONFIG = (process.env.CP_PEAK_DROP_CONFIG || '')
+        .toLowerCase()
+        .split('|')
+        .map(c =>
+            c.split(" ").filter(x => x.length > 0)
+        )
+        .filter(c =>
+            c.length == 4 &&
+            (!Number.isNaN(parseFloat(c[0]))) &&
+            (!Number.isNaN(parseFloat(c[1]))) &&
+            (!Number.isNaN(parseFloat(c[2]))) &&
+            (!Number.isNaN(parseFloat(c[3]))) &&
+            parseFloat(c[0]) > 0 &&
+            parseFloat(c[0]) <= 100 &&
+            parseFloat(c[1]) > 0 &&
+            parseFloat(c[2]) >= -100 &&
+            (parseFloat(c[3]) || Infinity) > parseFloat(c[2])
+        )
+        .map(c => ({
+            sellPerc: parseInt(c[0]),
+            minDropPerc: parseFloat(c[1]),
+            minPnLPerc: parseFloat(c[2]),
+            maxPnLPerc: parseFloat(c[3]) || Infinity,
+        }));
 }

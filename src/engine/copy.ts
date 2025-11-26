@@ -50,12 +50,14 @@ export class CopyEngine {
 
     static getAddressStartsWith = (pre: string) => Object.keys(CopyEngine.positions).find(addr => addr.startsWith(pre)) || null;
 
+    static mintPresent = (mint: string) => !!CopyEngine.positions[mint];
+
     static totalOpenedPositions: number = 0;
     static totalClosedPositions: number = 0;
     static totalRealizedPnLSOL: number = 0;
 
     static deletePosition = (mint: string) => {
-        if(CopyEngine.positions[mint]){
+        if (CopyEngine.positions[mint]) {
             CopyEngine.totalClosedPositions++;
             delete CopyEngine.positions[mint];
         }
@@ -67,10 +69,10 @@ export class CopyEngine {
     static copyTrader = async (trader: string, mint: string, amountSol: number, priceSol: number) => {
         // cleanup expired unconfirmed positions
         const MAX_DURATION = 120_000;
-        Object.entries(CopyEngine.positions).map(([mint, pos]) => ({...pos, mint})).filter(x => (!x.confirmed) && ((Date.now() - x.buyTime) >= MAX_DURATION))
-        .forEach(({mint}) => {
-            CopyEngine.deletePosition(mint);
-        });
+        Object.entries(CopyEngine.positions).map(([mint, pos]) => ({ ...pos, mint })).filter(x => (!x.confirmed) && ((Date.now() - x.buyTime) >= MAX_DURATION))
+            .forEach(({ mint }) => {
+                CopyEngine.deletePosition(mint);
+            });
         // Lets ensure the minimum copy value is met in SOL
         if (Object.keys(CopyEngine.positions).length < Site.CP_MAX_CONCURRENT_POSITIONS && amountSol >= Site.CP_MIN_COPY_SOL && Site.CP_CAPITAL_SOL > 0 && (!CopyEngine.positions[mint])) {
             // Lets try as quickly as possible to ensure that this is a first time buy
@@ -152,6 +154,15 @@ export class CopyEngine {
         }
     }
 
+    static getOwnBalance = () => new Promise<number | null>(async (resolve, reject) => {
+        try {
+            const bal = await (await SourceEngine()).getConnection().getBalance(Site.KEYPAIR.publicKey);
+            resolve(bal / 1e9);
+        } catch (error) {
+            Log.dev(error);
+            resolve(null);
+        }
+    });
 
     /**
      * This is called when trades are made by any wallet
@@ -187,6 +198,7 @@ export class CopyEngine {
 
             // Exit checks
             if (CopyEngine.positions[mint].amountHeld > 0) {
+                let soldAlready: boolean = false;
                 for (let i = 0; i < Site.CP_EXIT_CONFIG.length; i++) {
                     if (CopyEngine.positions[mint].sellIndices.includes(i)) {
                         continue;
@@ -197,6 +209,7 @@ export class CopyEngine {
                         CopyEngine.positions[mint].sellIndices.push(i);
                         const sold = await CopyEngine.sell(mint, c.sellPercentage, `Copy ${i}`, priceSol);
                         if (sold) {
+                            soldAlready = true;
                             break;
                         }
                         else {
@@ -208,10 +221,37 @@ export class CopyEngine {
                         CopyEngine.positions[mint].sellIndices.push(i);
                         const sold = await CopyEngine.sell(mint, c.sellPercentage, `${c.triggerValue > 0 ? 'TP' : 'SL'} ${i}`, priceSol);
                         if (sold) {
+                            soldAlready = true;
                             break;
                         }
                         else {
                             CopyEngine.positions[mint].sellIndices = CopyEngine.positions[mint].sellIndices.filter(x => x != i);
+                        }
+                    }
+                }
+
+                if(!soldAlready){
+                    const drop = CopyEngine.positions[mint].peakPnL - CopyEngine.positions[mint].pnL;
+                    for (let i = 0; i < Site.CP_PEAK_DROP_CONFIG.length; i++) {
+                        if (CopyEngine.positions[mint].PDIndices.includes(i)) {
+                            continue;
+                        }
+                        const c = Site.CP_PEAK_DROP_CONFIG[i];
+
+                        if(
+                            (drop >= c.minDropPerc) &&
+                            (CopyEngine.positions[mint].pnL >= c.minPnLPerc) &&
+                            (CopyEngine.positions[mint].pnL <= c.maxPnLPerc)
+                        ){
+                            CopyEngine.positions[mint].PDIndices.push(i);
+                            const sold = await CopyEngine.sell(mint, c.sellPerc, `PD ${i}`, priceSol);
+                            if (sold) {
+                                soldAlready = true;
+                                break;
+                            }
+                            else {
+                                CopyEngine.positions[mint].PDIndices = CopyEngine.positions[mint].PDIndices.filter(x => x != i);
+                            }
                         }
                     }
                 }
@@ -376,7 +416,7 @@ export class CopyEngine {
     /**
      * This closes empty token accounts so we recover rent
      */
-    private static recovery = async () => new Promise<boolean>(async (resolve, reject) => {
+    static recovery = async () => new Promise<boolean>(async (resolve, reject) => {
         const emptyTokenAccounts = (await CopyEngine.getOwnTokenAccounts()).filter(acc => acc.balance == 0);
         if (emptyTokenAccounts.length > 0) {
             resolve(await CopyEngine.closeEmptyTokenAccounts(emptyTokenAccounts.map(x => x.pubKey)));
@@ -408,6 +448,7 @@ export class CopyEngine {
                 pnL: 0,
                 solGotten: 0,
                 sellIndices: [],
+                PDIndices: [],
                 sellReasons: [],
                 lastSellTS: Date.now(),
             };
