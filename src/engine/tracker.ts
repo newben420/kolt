@@ -120,7 +120,7 @@ export class TrackerEngine {
         if (TrackerEngine.traderExists(traderPublicKey)) {
             const trader = TrackerEngine.getTrader(traderPublicKey);
             if(trader.copy){
-                (await CopyEngine()).copyTrader(traderPublicKey, mint, solAmount, priceSol);
+                (await CopyEngine()).copyTrader(traderPublicKey, mint, solAmount, priceSol, marketCapSol, pool);
             }
 
             trader.lastUpdated = Date.now();

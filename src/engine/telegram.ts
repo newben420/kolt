@@ -201,11 +201,12 @@ export class TelegramEngine {
                 let m = `${i + 1}. *${shortenAddress(position.mint)}* ${position.confirmed ? `✅` : `❌`}\n`;
                 m += `🕝 ${getTimeElapsed(position.buyTime, Date.now())} 🔄 ${getTimeElapsed(position.lastUpdated, Date.now())}\n`;
                 if (position.confirmed) {
-                    const returns = position.solGotten + (position.amountHeld * position.currentPrice);
+                    const returns = (position.solGotten + (position.amountHeld * position.currentPrice)) - position.buyCapital;
                     m += `💰 SOL ${FFF(returns)} \\(${FFF(position.pnL)}%\\) 🟩 ${FFF(position.peakPnL)}% 🟥 ${FFF(position.leastPnL)}%\n`;
                     if (position.solGotten) {
-                        m += `Sells 👉  SOL ${FFF(position.solGotten)} \\(${formatNumber(position.sellReasons.length)}%\\)`
+                        m += `Sells 👉  SOL ${FFF(position.solGotten)} \\(${formatNumber(position.sellReasons.length)}%\\)\n`
                     }
+                    m += `Price \`SOL ${position.currentPrice}\` MarketCap \`SOL ${position.currentMarketCap}\`\n`
                 }
 
                 inline.push([
@@ -457,7 +458,7 @@ export class TelegramEngine {
                                             });
 
                                             try {
-                                                const { message, inline } = await TelegramEngine.trackerMessage();
+                                                const { message, inline } = await TelegramEngine.positionsMessage();
                                                 const done = await TelegramEngine.bot.editMessageText(TelegramEngine.sanitizeMessage(message), {
                                                     chat_id: Site.TG_CHAT_ID,
                                                     message_id: callbackQuery?.message?.message_id,
@@ -484,7 +485,7 @@ export class TelegramEngine {
                                         });
 
                                         try {
-                                            const { message, inline } = await TelegramEngine.trackerMessage();
+                                            const { message, inline } = await TelegramEngine.positionsMessage();
                                             const done = await TelegramEngine.bot.editMessageText(TelegramEngine.sanitizeMessage(message), {
                                                 chat_id: Site.TG_CHAT_ID,
                                                 message_id: callbackQuery?.message?.message_id,

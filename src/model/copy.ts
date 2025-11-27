@@ -8,6 +8,7 @@ export interface Position {
     buyLatencyMS: number;
     sellLatenciesMS: number[];
     currentPrice: number;
+    currentMarketCap: number;
     peakPnL: number;
     leastPnL: number;
     pnL: number;
@@ -18,6 +19,7 @@ export interface Position {
     PDIndices: number[];
     sellReasons: string[];
     lastSellTS: number;
+    pool: string;
 }
 
 export interface WaitingSigns {
