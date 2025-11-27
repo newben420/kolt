@@ -92,9 +92,14 @@ export class TrackerEngine {
             if (pnl) TrackerEngine.traders[address].pnl = pnl;
             if (rpnl) TrackerEngine.traders[address].rpnl = rpnl;
             if (upnl) TrackerEngine.traders[address].upnl = upnl;
-            return false;
+            if(manual && (!TrackerEngine.traders[address].manuallyAdded)){
+                TrackerEngine.traders[address].manuallyAdded = true;
+                return true;
+            }
+            else{
+                return false;
+            }
         }
-        return true;
     }
 
     static getAddressStartsWith = (pre: string) => Object.keys(TrackerEngine.traders).find(addr => addr.startsWith(pre)) || null;

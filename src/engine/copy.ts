@@ -363,6 +363,7 @@ export class CopyEngine {
                 let avgSellLatency = Math.round(CopyEngine.positions[mint].sellLatenciesMS.reduce((a, b) => a + b, 0) / CopyEngine.positions[mint].sellLatenciesMS.length);
                 let copiedFrom = CopyEngine.positions[mint].copiedFrom;
                 const returns = CopyEngine.positions[mint].solGotten - CopyEngine.positions[mint].buyCapital;
+                const peakReturns = (CopyEngine.positions[mint].peakPnL / 100) * CopyEngine.positions[mint].buyCapital;
                 const sellReason = CopyEngine.positions[mint].sellReasons.join(", ");
                 const mc = CopyEngine.positions[mint].currentMarketCap;
                 const pr = CopyEngine.positions[mint].currentPrice;
@@ -372,13 +373,20 @@ export class CopyEngine {
                 // Get current rank, if any
                 const currentPosition = CopyEngine.topEarnedFrom.find(e => e.address == CopyEngine.positions[mint].copiedFrom);
                 // create stats object
+                const pnlUse = Site.CP_EARN_RANKING_BY_PEAK_PNL ? peakReturns : returns;
                 const rankStat: CopyStat = {
                     address: CopyEngine.positions[mint].copiedFrom,
-                    pnl: currentPosition ? (currentPosition.pnl + returns) : returns,
+                    pnl: currentPosition ? (currentPosition.pnl + pnlUse) : pnlUse,
                     positions: currentPosition ? (currentPosition.positions + 1) : 1,
                 }
                 // insert stats object
                 if (rankStat.pnl >= 0) {
+                    if (currentPosition) {
+                        const index = CopyEngine.topEarnedFrom.findIndex(x => x.address == rankStat.address);
+                        if (index >= 0) {
+                            CopyEngine.topEarnedFrom.splice(index, 1);
+                        }
+                    }
                     let insertIndex = -1;
                     for (let i = 0; i < CopyEngine.topEarnedFrom.length; i++) {
                         if (CopyEngine.topEarnedFrom[i].pnl < rankStat.pnl) {

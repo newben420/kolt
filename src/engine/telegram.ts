@@ -244,7 +244,7 @@ export class TelegramEngine {
     }
 
     private static ranksMessage = async () => {
-        let message: string = `🚀 *Top ${Site.CP_EARN_RANKING_MAX} Earning Source* ${getDateTime()}\n\n`;
+        let message: string = `🚀 *Top ${Site.CP_EARN_RANKING_MAX} Earning Source${Site.CP_CAPITAL_SOL ? ` \\(Peak\\)` : ``}* ${getDateTime()}\n\n`;
         let inline: TelegramBot.InlineKeyboardButton[][] = [];
         inline.push([
             {

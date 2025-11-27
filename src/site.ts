@@ -115,5 +115,6 @@ export class Site {
             minPnLPerc: parseFloat(c[2]),
             maxPnLPerc: parseFloat(c[3]) || Infinity,
         }));
-        static CP_EARN_RANKING_MAX: number = parseInt(process.env['CP_EARN_RANKING_MAX'] || '0') || 10;
-    }
+    static CP_EARN_RANKING_MAX: number = parseInt(process.env['CP_EARN_RANKING_MAX'] || '0') || 10;
+    static CP_EARN_RANKING_BY_PEAK_PNL: boolean = (process.env['CP_EARN_RANKING_BY_PEAK_PNL'] || '').toLowerCase() == "true";
+}
