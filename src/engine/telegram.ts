@@ -89,7 +89,7 @@ export class TelegramEngine {
             [
                 {
                     text: `${copy ? `🟥` : `🟩`} Auto Copy`,
-                    callback_data: `cptr_${copy ? 'true' : 'false'}`,
+                    callback_data: `cptr_${copy ? 'false' : 'true'}`,
                 }
             ]
         ];
