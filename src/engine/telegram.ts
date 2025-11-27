@@ -79,6 +79,8 @@ export class TelegramEngine {
         let message: string = `🎰 ${getDateTime()}\n\n`;
         message += `*Online* for ${getTimeElapsed(INSTANCE_START, Date.now())} \n\n`;
         const copy = (await TrackerEngine()).autoCopy;
+        const exit = (await CopyEngine()).exitFlag;
+        const pd = (await CopyEngine()).pdFlag;
         let inline: TelegramBot.InlineKeyboardButton[][] = [
             [
                 {
@@ -91,7 +93,19 @@ export class TelegramEngine {
                     text: `${copy ? `🟥` : `🟩`} Auto Copy`,
                     callback_data: `cptr_${copy ? 'false' : 'true'}`,
                 }
-            ]
+            ],
+            [
+                {
+                    text: `${exit ? `🟥` : `🟩`} Copy Exit`,
+                    callback_data: `cpex_${exit ? 'false' : 'true'}`,
+                }
+            ],
+            [
+                {
+                    text: `${pd ? `🟥` : `🟩`} Peak Drop`,
+                    callback_data: `cppd_${pd ? 'false' : 'true'}`,
+                }
+            ],
         ];
 
         const SETotalTokensMigrated = (await SourceEngine()).totalTokensMigrated;
@@ -229,6 +243,31 @@ export class TelegramEngine {
         return { message, inline };
     }
 
+    private static ranksMessage = async () => {
+        let message: string = `🚀 *Top ${Site.CP_EARN_RANKING_MAX} Earning Source* ${getDateTime()}\n\n`;
+        let inline: TelegramBot.InlineKeyboardButton[][] = [];
+        inline.push([
+            {
+                text: `♻️ Refresh`,
+                callback_data: `refreshranks`,
+            }
+        ]);
+        let ranks = (await CopyEngine()).getRanking();
+        if (ranks.length <= 0) {
+            message += `No ranks at the moment.`;
+        }
+        else {
+            message += ranks.map((rank, i) => {
+                let m = `${i + 1}. \`${rank.address}\`\n`;
+                m += `PnL 🟰 \`SOL ${FFF(rank.pnl)}\`\n`
+                m += `Positions 🟰 \`${formatNumber(rank.positions)}\`\n`
+                return m;
+            }).join("\n");
+        }
+
+        return { message, inline };
+    }
+
     static start = () => {
         return new Promise<boolean>((resolve, reject) => {
             TelegramEngine.bot = new TelegramBot(Site.TG_TOKEN, {
@@ -258,6 +297,10 @@ export class TelegramEngine {
                     description: "Manage Open Positions"
                 },
                 {
+                    command: "/ranks",
+                    description: "Show Top Earn Source Rankings"
+                },
+                {
                     command: "/balance",
                     description: "Get Own Wallet Balance"
                 },
@@ -282,6 +325,16 @@ export class TelegramEngine {
                     }
                     else if (/^\/tracker$/.test(content)) {
                         const { inline, message } = await TelegramEngine.trackerMessage();
+                        TelegramEngine.sendMessage(message, mid => { }, {
+                            disable_web_page_preview: true,
+                            parse_mode: 'MarkdownV2',
+                            reply_markup: {
+                                inline_keyboard: inline,
+                            }
+                        });
+                    }
+                    else if (/^\/ranks$/.test(content)) {
+                        const { inline, message } = await TelegramEngine.ranksMessage();
                         TelegramEngine.sendMessage(message, mid => { }, {
                             disable_web_page_preview: true,
                             parse_mode: 'MarkdownV2',
@@ -361,6 +414,23 @@ export class TelegramEngine {
                         try {
                             TelegramEngine.bot.answerCallbackQuery(callbackQuery.id);
                             const { message, inline } = await TelegramEngine.trackerMessage();
+                            const done = await TelegramEngine.bot.editMessageText(TelegramEngine.sanitizeMessage(message), {
+                                chat_id: Site.TG_CHAT_ID,
+                                message_id: callbackQuery?.message?.message_id,
+                                parse_mode: "MarkdownV2",
+                                disable_web_page_preview: true,
+                                reply_markup: {
+                                    inline_keyboard: inline
+                                }
+                            });
+                        } catch (error) {
+                            Log.dev(error);
+                        }
+                    }
+                    else if (callbackQuery.data == "refreshranks") {
+                        try {
+                            TelegramEngine.bot.answerCallbackQuery(callbackQuery.id);
+                            const { message, inline } = await TelegramEngine.ranksMessage();
                             const done = await TelegramEngine.bot.editMessageText(TelegramEngine.sanitizeMessage(message), {
                                 chat_id: Site.TG_CHAT_ID,
                                 message_id: callbackQuery?.message?.message_id,
@@ -621,6 +691,46 @@ export class TelegramEngine {
                             let temp = content.split(" ");
                             let value = (temp[1] || '').toLowerCase() == "true";
                             (await TrackerEngine()).autoCopy = value;
+                            try {
+                                TelegramEngine.bot.answerCallbackQuery(callbackQuery.id);
+                                const { message, inline } = await TelegramEngine.statusMessage();
+                                const done = await TelegramEngine.bot.editMessageText(TelegramEngine.sanitizeMessage(message), {
+                                    chat_id: Site.TG_CHAT_ID,
+                                    message_id: callbackQuery?.message?.message_id,
+                                    parse_mode: "MarkdownV2",
+                                    disable_web_page_preview: true,
+                                    reply_markup: {
+                                        inline_keyboard: inline
+                                    }
+                                });
+                            } catch (error) {
+                                Log.dev(error);
+                            }
+                        }
+                        else if (content.startsWith("cpex ")) {
+                            let temp = content.split(" ");
+                            let value = (temp[1] || '').toLowerCase() == "true";
+                            (await CopyEngine()).exitFlag = value;
+                            try {
+                                TelegramEngine.bot.answerCallbackQuery(callbackQuery.id);
+                                const { message, inline } = await TelegramEngine.statusMessage();
+                                const done = await TelegramEngine.bot.editMessageText(TelegramEngine.sanitizeMessage(message), {
+                                    chat_id: Site.TG_CHAT_ID,
+                                    message_id: callbackQuery?.message?.message_id,
+                                    parse_mode: "MarkdownV2",
+                                    disable_web_page_preview: true,
+                                    reply_markup: {
+                                        inline_keyboard: inline
+                                    }
+                                });
+                            } catch (error) {
+                                Log.dev(error);
+                            }
+                        }
+                        else if (content.startsWith("cppd ")) {
+                            let temp = content.split(" ");
+                            let value = (temp[1] || '').toLowerCase() == "true";
+                            (await CopyEngine()).pdFlag = value;
                             try {
                                 TelegramEngine.bot.answerCallbackQuery(callbackQuery.id);
                                 const { message, inline } = await TelegramEngine.statusMessage();

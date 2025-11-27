@@ -4,7 +4,7 @@ import { FFF, formatNumber } from './../lib/format_number';
 import { PPOBJ } from './../model/ppobj';
 import { PublicKey, Transaction, VersionedTransaction } from '@solana/web3.js';
 import { Log } from './../lib/log';
-import { Mint, Position, WaitingSigns } from './../model/copy';
+import { CopyStat, Mint, Position, WaitingSigns } from './../model/copy';
 import { Site } from './../site';
 
 let cachedMainEngine: typeof import('./main').MainEngine | null = null;
@@ -75,12 +75,12 @@ export class CopyEngine {
             });
         // Lets ensure the minimum copy value is met in SOL
         if (
-            Object.keys(CopyEngine.positions).length < Site.CP_MAX_CONCURRENT_POSITIONS && 
-            amountSol >= Site.CP_MIN_COPY_SOL &&
-            marketCapSol >= Site.CP_MIN_MARKETCAP_SOL &&
-            Site.CP_CAPITAL_SOL > 0 && 
-            (!CopyEngine.positions[mint]) &&
-            Site.CP_ALLOWED_POOL ? (pool == Site.CP_ALLOWED_POOL) : true
+            Object.keys(CopyEngine.positions).length < Site.CP_MAX_CONCURRENT_POSITIONS &&
+                amountSol >= Site.CP_MIN_COPY_SOL &&
+                marketCapSol >= Site.CP_MIN_MARKETCAP_SOL &&
+                Site.CP_CAPITAL_SOL > 0 &&
+                (!CopyEngine.positions[mint]) &&
+                Site.CP_ALLOWED_POOL ? (pool == Site.CP_ALLOWED_POOL) : true
         ) {
             // Lets try as quickly as possible to ensure that this is a first time buy
             // So we only copy new entries and ignore scaling
@@ -175,6 +175,9 @@ export class CopyEngine {
         }
     });
 
+    static exitFlag: boolean = Site.CP_AUTO_EXIT;
+    static pdFlag: boolean = Site.CP_AUTO_PEAKDROP;
+
     /**
      * This is called when trades are made by any wallet
      * @param m 
@@ -212,38 +215,41 @@ export class CopyEngine {
             // Exit checks
             if (CopyEngine.positions[mint].amountHeld > 0) {
                 let soldAlready: boolean = false;
-                for (let i = 0; i < Site.CP_EXIT_CONFIG.length; i++) {
-                    if (CopyEngine.positions[mint].sellIndices.includes(i)) {
-                        continue;
-                    }
-                    const c = Site.CP_EXIT_CONFIG[i];
-                    if (traderPublicKey == CopyEngine.positions[mint].copiedFrom && txType == "sell" && c.triggerByCopy && CopyEngine.positions[mint].pnL >= c.triggerValue) {
-                        // Copy Sell
-                        CopyEngine.positions[mint].sellIndices.push(i);
-                        const sold = await CopyEngine.sell(mint, c.sellPercentage, `Copy ${i}`, priceSol);
-                        if (sold) {
-                            soldAlready = true;
-                            break;
+                if ((!soldAlready) && CopyEngine.exitFlag) {
+                    for (let i = 0; i < Site.CP_EXIT_CONFIG.length; i++) {
+                        if (CopyEngine.positions[mint].sellIndices.includes(i)) {
+                            continue;
                         }
-                        else {
-                            CopyEngine.positions[mint].sellIndices = CopyEngine.positions[mint].sellIndices.filter(x => x != i);
+                        const c = Site.CP_EXIT_CONFIG[i];
+                        if (traderPublicKey == CopyEngine.positions[mint].copiedFrom && txType == "sell" && c.triggerByCopy && CopyEngine.positions[mint].pnL >= c.triggerValue) {
+                            // Copy Sell
+                            CopyEngine.positions[mint].sellIndices.push(i);
+                            const sold = await CopyEngine.sell(mint, c.sellPercentage, `Copy ${i}`, priceSol);
+                            if (sold) {
+                                soldAlready = true;
+                                break;
+                            }
+                            else {
+                                CopyEngine.positions[mint].sellIndices = CopyEngine.positions[mint].sellIndices.filter(x => x != i);
+                            }
                         }
-                    }
-                    else if ((!c.triggerByCopy) && c.triggerValue > 0 ? (CopyEngine.positions[mint].pnL >= c.triggerValue) : (CopyEngine.positions[mint].pnL <= c.triggerValue)) {
-                        // Take profit/ Stop Loss Sell
-                        CopyEngine.positions[mint].sellIndices.push(i);
-                        const sold = await CopyEngine.sell(mint, c.sellPercentage, `${c.triggerValue > 0 ? 'TP' : 'SL'} ${i}`, priceSol);
-                        if (sold) {
-                            soldAlready = true;
-                            break;
-                        }
-                        else {
-                            CopyEngine.positions[mint].sellIndices = CopyEngine.positions[mint].sellIndices.filter(x => x != i);
+                        else if ((!c.triggerByCopy) && c.triggerValue > 0 ? (CopyEngine.positions[mint].pnL >= c.triggerValue) : (CopyEngine.positions[mint].pnL <= c.triggerValue)) {
+                            // Take profit/ Stop Loss Sell
+                            CopyEngine.positions[mint].sellIndices.push(i);
+                            const sold = await CopyEngine.sell(mint, c.sellPercentage, `${c.triggerValue > 0 ? 'TP' : 'SL'} ${i}`, priceSol);
+                            if (sold) {
+                                soldAlready = true;
+                                break;
+                            }
+                            else {
+                                CopyEngine.positions[mint].sellIndices = CopyEngine.positions[mint].sellIndices.filter(x => x != i);
+                            }
                         }
                     }
                 }
 
-                if(!soldAlready){
+
+                if ((!soldAlready) && CopyEngine.pdFlag) {
                     const drop = CopyEngine.positions[mint].peakPnL - CopyEngine.positions[mint].pnL;
                     for (let i = 0; i < Site.CP_PEAK_DROP_CONFIG.length; i++) {
                         if (CopyEngine.positions[mint].PDIndices.includes(i)) {
@@ -251,11 +257,11 @@ export class CopyEngine {
                         }
                         const c = Site.CP_PEAK_DROP_CONFIG[i];
 
-                        if(
+                        if (
                             (drop >= c.minDropPerc) &&
                             (CopyEngine.positions[mint].pnL >= c.minPnLPerc) &&
                             (CopyEngine.positions[mint].pnL <= c.maxPnLPerc)
-                        ){
+                        ) {
                             CopyEngine.positions[mint].PDIndices.push(i);
                             const sold = await CopyEngine.sell(mint, c.sellPerc, `PD ${i}`, priceSol);
                             if (sold) {
@@ -331,6 +337,13 @@ export class CopyEngine {
     }
 
     /**
+     * This ranks the wallets we have earned more from when we copied them
+     */
+    private static topEarnedFrom: CopyStat[] = [];
+
+    static getRanking = () => CopyEngine.topEarnedFrom;
+
+    /**
      * This checks if amount held is almost equal to amouht bought so we know when we have sold all our holdings
      * So as to discard the position and call on recovery
      */
@@ -354,6 +367,38 @@ export class CopyEngine {
                 const mc = CopyEngine.positions[mint].currentMarketCap;
                 const pr = CopyEngine.positions[mint].currentPrice;
                 const pool = CopyEngine.positions[mint].pool;
+
+                // BEGIN RANKING
+                // Get current rank, if any
+                const currentPosition = CopyEngine.topEarnedFrom.find(e => e.address == CopyEngine.positions[mint].copiedFrom);
+                // create stats object
+                const rankStat: CopyStat = {
+                    address: CopyEngine.positions[mint].copiedFrom,
+                    pnl: currentPosition ? (currentPosition.pnl + returns) : returns,
+                    positions: currentPosition ? (currentPosition.positions + 1) : 1,
+                }
+                // insert stats object
+                if (rankStat.pnl >= 0) {
+                    let insertIndex = -1;
+                    for (let i = 0; i < CopyEngine.topEarnedFrom.length; i++) {
+                        if (CopyEngine.topEarnedFrom[i].pnl < rankStat.pnl) {
+                            insertIndex = i;
+                            break;
+                        }
+                    }
+                    if (insertIndex >= 0) {
+                        CopyEngine.topEarnedFrom.splice(insertIndex, 0, rankStat);
+                    }
+                    else {
+                        CopyEngine.topEarnedFrom.push(rankStat);
+                    }
+                    // trim ranking
+                    if (CopyEngine.topEarnedFrom.length > Site.CP_EARN_RANKING_MAX) {
+                        const delCount = CopyEngine.topEarnedFrom.length - Site.CP_EARN_RANKING_MAX;
+                        CopyEngine.topEarnedFrom.splice(Site.CP_EARN_RANKING_MAX, delCount);
+                    }
+                }
+                // END RANKING
 
                 CopyEngine.deletePosition(mint);
 

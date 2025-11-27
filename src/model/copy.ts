@@ -28,3 +28,9 @@ export interface WaitingSigns {
 }
 
 export type Mint = string;
+
+export interface CopyStat {
+    address: string;
+    positions: number;
+    pnl: number;
+}

@@ -59,6 +59,8 @@ export class Site {
 
     static CP_SIMULATION: boolean = (process.env['CP_SIMULATION'] || '').toLowerCase() == "true";
     static CP_AUTO_COPY: boolean = (process.env['CP_AUTO_COPY'] || '').toLowerCase() == "true";
+    static CP_AUTO_EXIT: boolean = (process.env['CP_AUTO_EXIT'] || '').toLowerCase() == "true";
+    static CP_AUTO_PEAKDROP: boolean = (process.env['CP_AUTO_PEAKDROP'] || '').toLowerCase() == "true";
     static CP_MIN_COPY_SOL: number = parseFloat(process.env['CP_MIN_COPY_SOL'] || '0') || 0;
     static CP_MIN_MARKETCAP_SOL: number = parseFloat(process.env['CP_MIN_MARKETCAP_SOL'] || '0') || 0;
     static CP_ALLOWED_POOL: string = process.env['CP_ALLOWED_POOL'] || '';
@@ -113,4 +115,5 @@ export class Site {
             minPnLPerc: parseFloat(c[2]),
             maxPnLPerc: parseFloat(c[3]) || Infinity,
         }));
-}
+        static CP_EARN_RANKING_MAX: number = parseInt(process.env['CP_EARN_RANKING_MAX'] || '0') || 10;
+    }
