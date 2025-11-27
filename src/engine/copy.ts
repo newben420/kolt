@@ -217,7 +217,7 @@ export class CopyEngine {
                         continue;
                     }
                     const c = Site.CP_EXIT_CONFIG[i];
-                    if (traderPublicKey == CopyEngine.positions[mint].copiedFrom && txType == "sell" && c.triggerByCopy && c.triggerValue > 0 ? (CopyEngine.positions[mint].pnL >= c.triggerValue) : (CopyEngine.positions[mint].pnL <= c.triggerValue)) {
+                    if (traderPublicKey == CopyEngine.positions[mint].copiedFrom && txType == "sell" && c.triggerByCopy && CopyEngine.positions[mint].pnL >= c.triggerValue) {
                         // Copy Sell
                         CopyEngine.positions[mint].sellIndices.push(i);
                         const sold = await CopyEngine.sell(mint, c.sellPercentage, `Copy ${i}`, priceSol);
