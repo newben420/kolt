@@ -58,6 +58,7 @@ export class Site {
     static TR_INACTIVITY_TIMEOUT_MS: number = parseInt(process.env['TR_INACTIVITY_TIMEOUT_MS'] || "0") || 1800000;
 
     static CP_SIMULATION: boolean = (process.env['CP_SIMULATION'] || '').toLowerCase() == "true";
+    static CP_AUTO_COPY: boolean = (process.env['CP_AUTO_COPY'] || '').toLowerCase() == "true";
     static CP_MIN_COPY_SOL: number = parseFloat(process.env['CP_MIN_COPY_SOL'] || '0') || 0;
     static CP_MIN_MARKETCAP_SOL: number = parseFloat(process.env['CP_MIN_MARKETCAP_SOL'] || '0') || 0;
     static CP_ALLOWED_POOL: string = process.env['CP_ALLOWED_POOL'] || '';

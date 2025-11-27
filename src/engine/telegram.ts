@@ -78,6 +78,7 @@ export class TelegramEngine {
     private static statusMessage = async () => {
         let message: string = `🎰 ${getDateTime()}\n\n`;
         message += `*Online* for ${getTimeElapsed(INSTANCE_START, Date.now())} \n\n`;
+        const copy = (await TrackerEngine()).autoCopy;
         let inline: TelegramBot.InlineKeyboardButton[][] = [
             [
                 {
@@ -85,6 +86,12 @@ export class TelegramEngine {
                     callback_data: 'refreshstatus',
                 },
             ],
+            [
+                {
+                    text: `${copy ? `🟥` : `🟩`} Auto Copy`,
+                    callback_data: `cptr_${copy ? 'true' : 'false'}`,
+                }
+            ]
         ];
 
         const SETotalTokensMigrated = (await SourceEngine()).totalTokensMigrated;
@@ -206,7 +213,7 @@ export class TelegramEngine {
                     if (position.solGotten) {
                         m += `Sells 👉  SOL ${FFF(position.solGotten)} \\(${formatNumber(position.sellReasons.length)}%\\)\n`
                     }
-                    m += `Price \`SOL ${position.currentPrice}\` MarketCap \`SOL ${position.currentMarketCap}\`\n`
+                    m += `Price \`SOL ${FFF(position.currentPrice)}\` MarketCap \`SOL ${FFF(position.currentMarketCap)}\`\n`
                 }
 
                 inline.push([
@@ -285,19 +292,19 @@ export class TelegramEngine {
                     }
                     else if (/^\/balance$/.test(content)) {
                         const balance = await (await CopyEngine()).getOwnBalance();
-                        if(balance === null){
+                        if (balance === null) {
                             TelegramEngine.sendMessage(`❌ Could not get wallet balance`);
                         }
-                        else{
+                        else {
                             TelegramEngine.sendMessage(`✅ *Wallet*\n\n📍 \`${Site.KEYPAIR.publicKey.toString()}\`\n💰\`SOL ${balance}\``);
                         }
                     }
                     else if (/^\/recover$/.test(content)) {
                         const done = await (await CopyEngine()).recovery();
-                        if(!done){
+                        if (!done) {
                             TelegramEngine.sendMessage(`❌ Could not complete operation`);
                         }
-                        else{
+                        else {
                             TelegramEngine.sendMessage(`✅ Empty token accounts closed`);
                         }
                     }
@@ -608,6 +615,26 @@ export class TelegramEngine {
                                 TelegramEngine.bot.answerCallbackQuery(callbackQuery.id, {
                                     text: `❌ Wallet not found!`,
                                 });
+                            }
+                        }
+                        else if (content.startsWith("cptr ")) {
+                            let temp = content.split(" ");
+                            let value = (temp[1] || '').toLowerCase() == "true";
+                            (await TrackerEngine()).autoCopy = value;
+                            try {
+                                TelegramEngine.bot.answerCallbackQuery(callbackQuery.id);
+                                const { message, inline } = await TelegramEngine.statusMessage();
+                                const done = await TelegramEngine.bot.editMessageText(TelegramEngine.sanitizeMessage(message), {
+                                    chat_id: Site.TG_CHAT_ID,
+                                    message_id: callbackQuery?.message?.message_id,
+                                    parse_mode: "MarkdownV2",
+                                    disable_web_page_preview: true,
+                                    reply_markup: {
+                                        inline_keyboard: inline
+                                    }
+                                });
+                            } catch (error) {
+                                Log.dev(error);
                             }
                         }
                     }

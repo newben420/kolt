@@ -57,6 +57,8 @@ export class TrackerEngine {
 
     static removedTradersCount: number = 0;
 
+    static autoCopy: boolean = Site.CP_AUTO_COPY;
+
     static addTrader = (address: TrackedTraderAddress, manual: boolean, { pnl, rpnl, upnl }: {
         pnl?: number;
         upnl?: number;
@@ -80,7 +82,7 @@ export class TrackerEngine {
                     upnl,
                     pnl,
                     showAlert: Site.TR_SEND_ACTIVITY,
-                    copy: false,
+                    copy: TrackerEngine.autoCopy,
                 };
                 return true;
             }
@@ -199,7 +201,7 @@ export class TrackerEngine {
         const walletsRemoved = Object.keys(TrackerEngine.traders).
             map(addr => ({ ...TrackerEngine.traders[addr], addr })).
             filter(tr => !tr.manuallyAdded).
-            filter(tr => (Date.now() - (tr.lastUpdated || 0)) >= Site.TR_INACTIVITY_TIMEOUT_MS && (!tr.copy)).
+            filter(tr => (Date.now() - (tr.lastUpdated || 0)) >= Site.TR_INACTIVITY_TIMEOUT_MS).
             map(tr => ({ ...tr, removed: TrackerEngine.removeTrader(tr.addr) })).
             filter(tr => tr.removed);
 
