@@ -80,6 +80,7 @@ export class TelegramEngine {
         message += `*Online* for ${getTimeElapsed(INSTANCE_START, Date.now())} \n\n`;
         const copy = (await TrackerEngine()).autoCopy;
         const exit = (await CopyEngine()).exitFlag;
+        const alrt = (await CopyEngine()).alertFlag;
         const pd = (await CopyEngine()).pdFlag;
         let inline: TelegramBot.InlineKeyboardButton[][] = [
             [
@@ -104,6 +105,12 @@ export class TelegramEngine {
                 {
                     text: `${pd ? `🟥` : `🟩`} Peak Drop`,
                     callback_data: `cppd_${pd ? 'false' : 'true'}`,
+                }
+            ],
+            [
+                {
+                    text: `${alrt ? `🟥` : `🟩`} Copy Alert`,
+                    callback_data: `cpat_${alrt ? 'false' : 'true'}`,
                 }
             ],
         ];
@@ -258,9 +265,17 @@ export class TelegramEngine {
         }
         else {
             message += ranks.map((rank, i) => {
+                let winsPerc: number = 0;
+                try {
+                    winsPerc = ((rank.wins / (rank.loses + rank.wins)) * 100) || 0;
+                } catch (error) {
+                    
+                }
                 let m = `${i + 1}. \`${rank.address}\`\n`;
                 m += `PnL 🟰 \`SOL ${FFF(rank.pnl)}\`\n`
                 m += `Positions 🟰 \`${formatNumber(rank.positions)}\`\n`
+                m += `W n L 🟰 \`${formatNumber(rank.wins)} n ${formatNumber(rank.loses)} ${FFF(winsPerc)}%\`\n`
+                m += `WPnL n LPnL 🟰 \`SOL ${FFF(rank.winPnL)} n SOL ${FFF(rank.losePnL)}\`\n`
                 return m;
             }).join("\n");
         }
@@ -711,6 +726,26 @@ export class TelegramEngine {
                             let temp = content.split(" ");
                             let value = (temp[1] || '').toLowerCase() == "true";
                             (await CopyEngine()).exitFlag = value;
+                            try {
+                                TelegramEngine.bot.answerCallbackQuery(callbackQuery.id);
+                                const { message, inline } = await TelegramEngine.statusMessage();
+                                const done = await TelegramEngine.bot.editMessageText(TelegramEngine.sanitizeMessage(message), {
+                                    chat_id: Site.TG_CHAT_ID,
+                                    message_id: callbackQuery?.message?.message_id,
+                                    parse_mode: "MarkdownV2",
+                                    disable_web_page_preview: true,
+                                    reply_markup: {
+                                        inline_keyboard: inline
+                                    }
+                                });
+                            } catch (error) {
+                                Log.dev(error);
+                            }
+                        }
+                        else if (content.startsWith("cpat ")) {
+                            let temp = content.split(" ");
+                            let value = (temp[1] || '').toLowerCase() == "true";
+                            (await CopyEngine()).alertFlag = value;
                             try {
                                 TelegramEngine.bot.answerCallbackQuery(callbackQuery.id);
                                 const { message, inline } = await TelegramEngine.statusMessage();

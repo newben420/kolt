@@ -115,20 +115,23 @@ export class CopyEngine {
                     CopyEngine.positions[m.mint].buyPrice = m.priceSol;
                     CopyEngine.positions[m.mint].confirmed = true;
 
-                    let mess = `✅ *Buy*\n\n`;
-                    mess += `Capital 🟰 \`SOL ${FFF(CopyEngine.positions[m.mint].buyCapital)}\`\n`;
-                    mess += `Amount 🟰 \`${FFF(CopyEngine.positions[m.mint].buyAmount)}\`\n`;
-                    mess += `Price 🟰 \`SOL ${FFF(m.priceSol)}\`\n`;
-                    mess += `MarketCap 🟰 \`SOL ${FFF(m.marketCapSol)}\`\n`;
-                    if (CopyEngine.positions[m.mint].buyLatencyMS) {
-                        mess += `Latency 🟰 \`${formatNumber(CopyEngine.positions[m.mint].buyLatencyMS)}ms\`\n`;
+                    if (CopyEngine.alertFlag) {
+                        let mess = `✅ *Buy*\n\n`;
+                        mess += `Capital 🟰 \`SOL ${FFF(CopyEngine.positions[m.mint].buyCapital)}\`\n`;
+                        mess += `Amount 🟰 \`${FFF(CopyEngine.positions[m.mint].buyAmount)}\`\n`;
+                        mess += `Price 🟰 \`SOL ${FFF(m.priceSol)}\`\n`;
+                        mess += `MarketCap 🟰 \`SOL ${FFF(m.marketCapSol)}\`\n`;
+                        if (CopyEngine.positions[m.mint].buyLatencyMS) {
+                            mess += `Latency 🟰 \`${formatNumber(CopyEngine.positions[m.mint].buyLatencyMS)}ms\`\n`;
+                        }
+                        mess += `Mint 🟰 \`${m.mint}\`\n`;
+                        mess += `Pool 🟰 \`${m.pool}\`\n`;
+                        mess += `Copied From 🟰 \`${CopyEngine.positions[m.mint].copiedFrom}\`\n`;
+                        mess += `Signature 🟰 \`${m.signature}\`\n`;
+                        (await TelegramEngine()).sendMessage(mess);
                     }
-                    mess += `Mint 🟰 \`${m.mint}\`\n`;
-                    mess += `Pool 🟰 \`${m.pool}\`\n`;
-                    mess += `Copied From 🟰 \`${CopyEngine.positions[m.mint].copiedFrom}\`\n`;
-                    mess += `Signature 🟰 \`${m.signature}\`\n`;
 
-                    (await TelegramEngine()).sendMessage(mess);
+
                 }
                 else if (m.txType == "sell" && !CopyEngine.waitingSigns[m.signature].isBuy) {
                     // Own sell order confirmed
@@ -145,19 +148,22 @@ export class CopyEngine {
                     CopyEngine.positions[m.mint].solGotten += returnVal;
                     CopyEngine.positions[m.mint].lastSellTS = Date.now();
 
-                    let mess = `✅ *Sell*\n\n`;
-                    mess += `Amount 🟰 \`${amtPerc}%\`\n`;
-                    mess += `Returns 🟰 \`SOL ${FFF(returnVal)}\`\n`;
-                    mess += `Price 🟰 \`SOL ${FFF(m.priceSol)}\`\n`;
-                    mess += `MarketCap 🟰 \`SOL ${FFF(m.marketCapSol)}\`\n`;
-                    if (latency) {
-                        mess += `Latency 🟰 \`${formatNumber(latency)}ms\`\n`;
-                    }
-                    mess += `Mint 🟰 \`${m.mint}\`\n`;
-                    mess += `Pool 🟰 \`${m.pool}\`\n`;
-                    mess += `Signature 🟰 \`${m.signature}\`\n`;
+                    if (CopyEngine.alertFlag) {
+                        let mess = `✅ *Sell*\n\n`;
+                        mess += `Amount 🟰 \`${amtPerc}%\`\n`;
+                        mess += `Returns 🟰 \`SOL ${FFF(returnVal)}\`\n`;
+                        mess += `Price 🟰 \`SOL ${FFF(m.priceSol)}\`\n`;
+                        mess += `MarketCap 🟰 \`SOL ${FFF(m.marketCapSol)}\`\n`;
+                        if (latency) {
+                            mess += `Latency 🟰 \`${formatNumber(latency)}ms\`\n`;
+                        }
+                        mess += `Mint 🟰 \`${m.mint}\`\n`;
+                        mess += `Pool 🟰 \`${m.pool}\`\n`;
+                        mess += `Signature 🟰 \`${m.signature}\`\n`;
 
-                    (await TelegramEngine()).sendMessage(mess);
+                        (await TelegramEngine()).sendMessage(mess);
+                    }
+
 
                     CopyEngine.cleanUpPositionAfterSell(m.mint);
                 }
@@ -177,6 +183,7 @@ export class CopyEngine {
 
     static exitFlag: boolean = Site.CP_AUTO_EXIT;
     static pdFlag: boolean = Site.CP_AUTO_PEAKDROP;
+    static alertFlag: boolean = Site.CP_AUTO_ALERT;
 
     /**
      * This is called when trades are made by any wallet
@@ -311,19 +318,21 @@ export class CopyEngine {
                     CopyEngine.positions[mint].sellLatenciesMS.push(latency);
                     CopyEngine.positions[mint].solGotten += solValue;
 
-                    let m = `✅ *Sell*\n\n`;
-                    m += `Amount 🟰 \`${amountPerc}%\`\n`;
-                    m += `Returns 🟰 \`SOL ${FFF(solValue)}\`\n`;
-                    m += `Price 🟰 \`SOL ${FFF(priceSol)}\`\n`;
-                    m += `MarketCap 🟰 \`SOL ${FFF(CopyEngine.positions[mint].currentMarketCap)}\`\n`;
-                    if (latency) {
-                        m += `Latency 🟰 \`${formatNumber(latency)}ms\`\n`;
-                    }
-                    m += `Mint 🟰 \`${mint}\`\n`;
-                    m += `Pool 🟰 \`${CopyEngine.positions[mint].pool}\`\n`;
-                    m += `Signature 🟰 \`simulation_${Date.now()}\`\n`;
+                    if (CopyEngine.alertFlag) {
+                        let m = `✅ *Sell*\n\n`;
+                        m += `Amount 🟰 \`${amountPerc}%\`\n`;
+                        m += `Returns 🟰 \`SOL ${FFF(solValue)}\`\n`;
+                        m += `Price 🟰 \`SOL ${FFF(priceSol)}\`\n`;
+                        m += `MarketCap 🟰 \`SOL ${FFF(CopyEngine.positions[mint].currentMarketCap)}\`\n`;
+                        if (latency) {
+                            m += `Latency 🟰 \`${formatNumber(latency)}ms\`\n`;
+                        }
+                        m += `Mint 🟰 \`${mint}\`\n`;
+                        m += `Pool 🟰 \`${CopyEngine.positions[mint].pool}\`\n`;
+                        m += `Signature 🟰 \`simulation_${Date.now()}\`\n`;
 
-                    (await TelegramEngine()).sendMessage(m);
+                        (await TelegramEngine()).sendMessage(m);
+                    }
 
                     CopyEngine.cleanUpPositionAfterSell(mint);
 
@@ -378,6 +387,10 @@ export class CopyEngine {
                     address: CopyEngine.positions[mint].copiedFrom,
                     pnl: currentPosition ? (currentPosition.pnl + pnlUse) : pnlUse,
                     positions: currentPosition ? (currentPosition.positions + 1) : 1,
+                    wins: (currentPosition?.wins || 0) + (returns > 0 ? 1 : 0),
+                    loses: (currentPosition?.loses || 0) + (returns < 0 ? 1 : 0),
+                    winPnL: (currentPosition?.winPnL || 0) + (returns > 0 ? pnlUse : 0),
+                    losePnL: (currentPosition?.losePnL || 0) + (returns < 0 ? returns : 0),
                 }
                 // insert stats object
                 if (rankStat.pnl >= 0) {
@@ -412,19 +425,22 @@ export class CopyEngine {
 
                 CopyEngine.totalRealizedPnLSOL += returns;
 
-                let m = `✅ *Close Position*\n\n`;
-                m += `PnL 🟰 \`SOL ${FFF(returns)} (${FFF(pnl)}%)\`\n`;
-                m += `Least n Peak PnL 🟰 \`${FFF(pnlLeast)}% ${FFF(pnlPeak)}%\`\n`;
-                m += `Sells 🟰 \`${timesSold} (${sellReason})\`\n`;
-                m += `Duration 🟰 \`${getTimeElapsed(0, tradeDurationMs)}\`\n`;
-                m += `AVG Buy n Sell Latencies  🟰 \`${FFF(buyLatency)}ms ${FFF(avgSellLatency)}ms\`\n`;
-                m += `Mint 🟰 \`${mint}\`\n`;
-                m += `Pool 🟰 \`${pool}\`\n`;
-                m += `Current Price 🟰 \`SOL ${FFF(pr)}\`\n`;
-                m += `Current MarketCap 🟰 \`SOL ${FFF(mc)}\`\n`;
-                m += `Copied From 🟰 \`${copiedFrom}\`\n`;
+                if (CopyEngine.alertFlag) {
+                    let m = `✅ *Close Position*\n\n`;
+                    m += `PnL 🟰 \`SOL ${FFF(returns)} (${FFF(pnl)}%)\`\n`;
+                    m += `Least n Peak PnL 🟰 \`${FFF(pnlLeast)}% ${FFF(pnlPeak)}%\`\n`;
+                    m += `Sells 🟰 \`${timesSold} (${sellReason})\`\n`;
+                    m += `Duration 🟰 \`${getTimeElapsed(0, tradeDurationMs)}\`\n`;
+                    m += `AVG Buy n Sell Latencies  🟰 \`${FFF(buyLatency)}ms ${FFF(avgSellLatency)}ms\`\n`;
+                    m += `Mint 🟰 \`${mint}\`\n`;
+                    m += `Pool 🟰 \`${pool}\`\n`;
+                    m += `Current Price 🟰 \`SOL ${FFF(pr)}\`\n`;
+                    m += `Current MarketCap 🟰 \`SOL ${FFF(mc)}\`\n`;
+                    m += `Copied From 🟰 \`${copiedFrom}\`\n`;
 
-                (await TelegramEngine()).sendMessage(m);
+                    (await TelegramEngine()).sendMessage(m);
+                }
+
 
                 CopyEngine.recovery();
             }
@@ -556,20 +572,23 @@ export class CopyEngine {
                     CopyEngine.positions[mint].confirmed = true;
                     CopyEngine.positions[mint].buyLatencyMS = 0;
 
-                    let m = `✅ *Buy*\n\n`;
-                    m += `Capital 🟰 \`SOL ${FFF(CopyEngine.positions[mint].buyCapital)}\`\n`;
-                    m += `Amount 🟰 \`${FFF(CopyEngine.positions[mint].buyAmount)}\`\n`;
-                    m += `Price 🟰 \`SOL ${FFF(priceSol)}\`\n`;
-                    m += `MarketCap 🟰 \`SOL ${FFF(marketCapSol)}\`\n`;
-                    if (CopyEngine.positions[mint].buyLatencyMS) {
-                        m += `Latency 🟰 \`${formatNumber(CopyEngine.positions[mint].buyLatencyMS)}ms\`\n`;
-                    }
-                    m += `Mint 🟰 \`${mint}\`\n`;
-                    m += `Pool 🟰 \`${pool}\`\n`;
-                    m += `Copied From 🟰 \`${trader}\`\n`;
-                    m += `Signature 🟰 \`simulation_${Date.now()}\`\n`;
+                    if (CopyEngine.alertFlag) {
+                        let m = `✅ *Buy*\n\n`;
+                        m += `Capital 🟰 \`SOL ${FFF(CopyEngine.positions[mint].buyCapital)}\`\n`;
+                        m += `Amount 🟰 \`${FFF(CopyEngine.positions[mint].buyAmount)}\`\n`;
+                        m += `Price 🟰 \`SOL ${FFF(priceSol)}\`\n`;
+                        m += `MarketCap 🟰 \`SOL ${FFF(marketCapSol)}\`\n`;
+                        if (CopyEngine.positions[mint].buyLatencyMS) {
+                            m += `Latency 🟰 \`${formatNumber(CopyEngine.positions[mint].buyLatencyMS)}ms\`\n`;
+                        }
+                        m += `Mint 🟰 \`${mint}\`\n`;
+                        m += `Pool 🟰 \`${pool}\`\n`;
+                        m += `Copied From 🟰 \`${trader}\`\n`;
+                        m += `Signature 🟰 \`simulation_${Date.now()}\`\n`;
 
-                    (await TelegramEngine()).sendMessage(m);
+                        (await TelegramEngine()).sendMessage(m);
+                    }
+
 
                     return true;
                 }
@@ -647,18 +666,21 @@ export class CopyEngine {
         if (tx) {
             const sign = await CopyEngine.sendTx(tx);
             if (sign) {
-                let m = `✅ *Transaction*\n\n`;
-                m += `Action 🟰 \`${action == "buy" ? 'Buy' : 'Sell'}\`\n`;
-                m += `Amount 🟰 \`${amount}\`\n`;
-                m += `Mint 🟰 \`${mint}\`\n`;
-                m += `Signature 🟰 \`${sign}\`\n`;
+                if (CopyEngine.alertFlag) {
+                    let m = `✅ *Transaction*\n\n`;
+                    m += `Action 🟰 \`${action == "buy" ? 'Buy' : 'Sell'}\`\n`;
+                    m += `Amount 🟰 \`${amount}\`\n`;
+                    m += `Mint 🟰 \`${mint}\`\n`;
+                    m += `Signature 🟰 \`${sign}\`\n`;
+                    (await TelegramEngine()).sendMessage(m);
+                }
+
 
                 if (CopyEngine.positions[mint]) {
                     // Reflect fees in PnL
                     CopyEngine.positions[mint].solGotten -= Site.CP_FEES_PER_TRADE_SOL;
                 }
 
-                (await TelegramEngine()).sendMessage(m);
             }
             return sign;
         }

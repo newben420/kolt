@@ -60,6 +60,7 @@ export class Site {
     static CP_SIMULATION: boolean = (process.env['CP_SIMULATION'] || '').toLowerCase() == "true";
     static CP_AUTO_COPY: boolean = (process.env['CP_AUTO_COPY'] || '').toLowerCase() == "true";
     static CP_AUTO_EXIT: boolean = (process.env['CP_AUTO_EXIT'] || '').toLowerCase() == "true";
+    static CP_AUTO_ALERT: boolean = (process.env['CP_AUTO_ALERT'] || '').toLowerCase() == "true";
     static CP_AUTO_PEAKDROP: boolean = (process.env['CP_AUTO_PEAKDROP'] || '').toLowerCase() == "true";
     static CP_MIN_COPY_SOL: number = parseFloat(process.env['CP_MIN_COPY_SOL'] || '0') || 0;
     static CP_MIN_MARKETCAP_SOL: number = parseFloat(process.env['CP_MIN_MARKETCAP_SOL'] || '0') || 0;

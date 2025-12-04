@@ -33,4 +33,8 @@ export interface CopyStat {
     address: string;
     positions: number;
     pnl: number;
+    winPnL: number;
+    losePnL: number;
+    wins: number;
+    loses: number;
 }
