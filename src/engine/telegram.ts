@@ -82,6 +82,7 @@ export class TelegramEngine {
         const exit = (await CopyEngine()).exitFlag;
         const alrt = (await CopyEngine()).alertFlag;
         const pd = (await CopyEngine()).pdFlag;
+        const manage = (await TrackerEngine()).autoManage;
         let inline: TelegramBot.InlineKeyboardButton[][] = [
             [
                 {
@@ -93,6 +94,12 @@ export class TelegramEngine {
                 {
                     text: `${copy ? `🟥` : `🟩`} Auto Copy`,
                     callback_data: `cptr_${copy ? 'false' : 'true'}`,
+                }
+            ],
+            [
+                {
+                    text: `${manage ? `🟥` : `🟩`} Auto Tracker`,
+                    callback_data: `trtr_${manage ? 'false' : 'true'}`,
                 }
             ],
             [
@@ -726,6 +733,26 @@ export class TelegramEngine {
                             let temp = content.split(" ");
                             let value = (temp[1] || '').toLowerCase() == "true";
                             (await CopyEngine()).exitFlag = value;
+                            try {
+                                TelegramEngine.bot.answerCallbackQuery(callbackQuery.id);
+                                const { message, inline } = await TelegramEngine.statusMessage();
+                                const done = await TelegramEngine.bot.editMessageText(TelegramEngine.sanitizeMessage(message), {
+                                    chat_id: Site.TG_CHAT_ID,
+                                    message_id: callbackQuery?.message?.message_id,
+                                    parse_mode: "MarkdownV2",
+                                    disable_web_page_preview: true,
+                                    reply_markup: {
+                                        inline_keyboard: inline
+                                    }
+                                });
+                            } catch (error) {
+                                Log.dev(error);
+                            }
+                        }
+                        else if (content.startsWith("trtr ")) {
+                            let temp = content.split(" ");
+                            let value = (temp[1] || '').toLowerCase() == "true";
+                            (await TrackerEngine()).autoManage = value;
                             try {
                                 TelegramEngine.bot.answerCallbackQuery(callbackQuery.id);
                                 const { message, inline } = await TelegramEngine.statusMessage();

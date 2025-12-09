@@ -58,6 +58,7 @@ export class TrackerEngine {
     static removedTradersCount: number = 0;
 
     static autoCopy: boolean = Site.CP_AUTO_COPY;
+    static autoManage: boolean = Site.TR_AUTO_MANAGE_TRADERS;
 
     static addTrader = (address: TrackedTraderAddress, manual: boolean, { pnl, rpnl, upnl }: {
         pnl?: number;
@@ -92,11 +93,11 @@ export class TrackerEngine {
             if (pnl) TrackerEngine.traders[address].pnl = pnl;
             if (rpnl) TrackerEngine.traders[address].rpnl = rpnl;
             if (upnl) TrackerEngine.traders[address].upnl = upnl;
-            if(manual && (!TrackerEngine.traders[address].manuallyAdded)){
+            if (manual && (!TrackerEngine.traders[address].manuallyAdded)) {
                 TrackerEngine.traders[address].manuallyAdded = true;
                 return true;
             }
-            else{
+            else {
                 return false;
             }
         }
@@ -126,7 +127,7 @@ export class TrackerEngine {
     }: PPOBJ) => {
         if (TrackerEngine.traderExists(traderPublicKey)) {
             const trader = TrackerEngine.getTrader(traderPublicKey);
-            if(trader.copy){
+            if (trader.copy) {
                 (await CopyEngine()).copyTrader(traderPublicKey, mint, solAmount, priceSol, marketCapSol, pool);
             }
 
@@ -140,7 +141,7 @@ export class TrackerEngine {
                 trader.sellsSol += solAmount;
             }
 
-            
+
 
             if (trader.showAlert) {
                 let m = `${txType == 'buy' ? `🟩` : `🟥`} *${shortenAddress(traderPublicKey)}* ${txType == 'buy' ? `bought with` : `sold for`} SOL${FFF(solAmount)} at ${FFF(priceSol)}\n\n`;
@@ -202,42 +203,44 @@ export class TrackerEngine {
         }
         Log.flow([SLUG, `Iteration`, `Initialized.`], WEIGHT);
 
-        // Removing Traders (Garbage Collection)
-        const walletsRemoved = Object.keys(TrackerEngine.traders).
-            map(addr => ({ ...TrackerEngine.traders[addr], addr })).
-            filter(tr => !tr.manuallyAdded).
-            filter(tr => (Date.now() - (tr.lastUpdated || 0)) >= Site.TR_INACTIVITY_TIMEOUT_MS).
-            map(tr => ({ ...tr, removed: TrackerEngine.removeTrader(tr.addr) })).
-            filter(tr => tr.removed);
+        if (TrackerEngine.autoManage) {
+            // Removing Traders (Garbage Collection)
+            const walletsRemoved = Object.keys(TrackerEngine.traders).
+                map(addr => ({ ...TrackerEngine.traders[addr], addr })).
+                filter(tr => !tr.manuallyAdded).
+                filter(tr => (Date.now() - (tr.lastUpdated || 0)) >= Site.TR_INACTIVITY_TIMEOUT_MS).
+                map(tr => ({ ...tr, removed: TrackerEngine.removeTrader(tr.addr) })).
+                filter(tr => tr.removed);
 
-        if (walletsRemoved.length > 0) {
-            const l = walletsRemoved.length;
-            Log.flow([SLUG, `Iteration`, `Removed traders (count: ${l}).`], WEIGHT);
-            if (Site.TR_SEND_AUTO_REM) {
-                let m = `❌ *Removed ${l} Top Trader${l == 1 ? '' : 's'}*\n\n`
-                m += `\`\`\`\n${walletsRemoved.map((tr, i) => `${(i + 1)}. ${shortenAddress(tr.addr)} (${getTimeElapsed(tr.lastUpdated, Date.now())})`).join('\n')}\`\`\``;
-                (await TelegramEngine()).sendMessage(m);
+            if (walletsRemoved.length > 0) {
+                const l = walletsRemoved.length;
+                Log.flow([SLUG, `Iteration`, `Removed traders (count: ${l}).`], WEIGHT);
+                if (Site.TR_SEND_AUTO_REM) {
+                    let m = `❌ *Removed ${l} Top Trader${l == 1 ? '' : 's'}*\n\n`
+                    m += `\`\`\`\n${walletsRemoved.map((tr, i) => `${(i + 1)}. ${shortenAddress(tr.addr)} (${getTimeElapsed(tr.lastUpdated, Date.now())})`).join('\n')}\`\`\``;
+                    (await TelegramEngine()).sendMessage(m);
+                }
+
             }
 
-        }
+            // Adding Top Traders
+            const addedTraders = (await MainEngine()).getTopTraders(Site.TR_MAX_TRADERS).map(tr => ({
+                ...tr,
+                added: TrackerEngine.addTrader(tr.address, false, {
+                    pnl: tr.totalPnL,
+                    rpnl: tr.realizedPnL,
+                    upnl: tr.unrealizedPnL,
+                }),
+            })).filter(tr => tr.added);
 
-        // Adding Top Traders
-        const addedTraders = (await MainEngine()).getTopTraders(Site.TR_MAX_TRADERS).map(tr => ({
-            ...tr,
-            added: TrackerEngine.addTrader(tr.address, false, {
-                pnl: tr.totalPnL,
-                rpnl: tr.realizedPnL,
-                upnl: tr.unrealizedPnL,
-            }),
-        })).filter(tr => tr.added);
-
-        if (addedTraders.length > 0) {
-            Log.flow([SLUG, `Iteration`, `Added top traders (count: ${addedTraders.length}).`], WEIGHT);
-            if (Site.TR_SEND_AUTO_ADD) {
-                const l = addedTraders.length;
-                let m = `✅ *Added ${l} Top Trader${l == 1 ? '' : 's'}*\n\n`
-                m += `\`\`\`\n${addedTraders.map((tr, i) => `${(i + 1)}. ${shortenAddress(tr.address)} (${FFF(tr.totalPnL * 100)}%)`).join('\n')}\`\`\``;
-                (await TelegramEngine()).sendMessage(m);
+            if (addedTraders.length > 0) {
+                Log.flow([SLUG, `Iteration`, `Added top traders (count: ${addedTraders.length}).`], WEIGHT);
+                if (Site.TR_SEND_AUTO_ADD) {
+                    const l = addedTraders.length;
+                    let m = `✅ *Added ${l} Top Trader${l == 1 ? '' : 's'}*\n\n`
+                    m += `\`\`\`\n${addedTraders.map((tr, i) => `${(i + 1)}. ${shortenAddress(tr.address)} (${FFF(tr.totalPnL * 100)}%)`).join('\n')}\`\`\``;
+                    (await TelegramEngine()).sendMessage(m);
+                }
             }
         }
 

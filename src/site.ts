@@ -56,6 +56,7 @@ export class Site {
     static TR_SEND_AUTO_REM: boolean = (process.env['TR_SEND_AUTO_REM'] || '').toLowerCase() == "true";
     static TR_SEND_ACTIVITY: boolean = (process.env['TR_SEND_ACTIVITY'] || '').toLowerCase() == "true";
     static TR_INACTIVITY_TIMEOUT_MS: number = parseInt(process.env['TR_INACTIVITY_TIMEOUT_MS'] || "0") || 1800000;
+    static TR_AUTO_MANAGE_TRADERS: boolean = (process.env["TR_AUTO_MANAGE_TRADERS"] || '').toLowerCase() == "true";
 
     static CP_SIMULATION: boolean = (process.env['CP_SIMULATION'] || '').toLowerCase() == "true";
     static CP_AUTO_COPY: boolean = (process.env['CP_AUTO_COPY'] || '').toLowerCase() == "true";
