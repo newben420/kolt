@@ -37,4 +37,8 @@ export interface CopyStat {
     losePnL: number;
     wins: number;
     loses: number;
+    maxPnLPerc: number;
+    minPnLPerc: number;
+    avgPnLPerc: number;
+    avgPPCount: number;
 }

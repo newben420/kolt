@@ -365,6 +365,7 @@ export class CopyEngine {
                 // lets do analytics
                 let pnl = CopyEngine.positions[mint].pnL;
                 let pnlPeak = CopyEngine.positions[mint].peakPnL;
+                let pnlPerc = (pnl / CopyEngine.positions[mint].buyCapital) / 100;
                 let pnlLeast = CopyEngine.positions[mint].leastPnL;
                 let timesSold = CopyEngine.positions[mint].sellReasons.length;
                 let tradeDurationMs = CopyEngine.positions[mint].lastSellTS - CopyEngine.positions[mint].buyTime;
@@ -378,9 +379,13 @@ export class CopyEngine {
                 const pr = CopyEngine.positions[mint].currentPrice;
                 const pool = CopyEngine.positions[mint].pool;
 
+
                 // BEGIN RANKING
                 // Get current rank, if any
                 const currentPosition = CopyEngine.topEarnedFrom.find(e => e.address == CopyEngine.positions[mint].copiedFrom);
+
+                const avgPPCount = currentPosition ? (currentPosition.avgPPCount + 1) : 1;
+                const avgPnLPerc = currentPosition ? (((currentPosition.avgPPCount * currentPosition.avgPnLPerc) + pnlPerc) / (currentPosition.avgPPCount + 1)) : pnlPerc;
                 // create stats object
                 const pnlUse = Site.CP_EARN_RANKING_BY_PEAK_PNL ? peakReturns : returns;
                 const rankStat: CopyStat = {
@@ -391,6 +396,10 @@ export class CopyEngine {
                     loses: (currentPosition?.loses || 0) + (returns < 0 ? 1 : 0),
                     winPnL: (currentPosition?.winPnL || 0) + (returns > 0 ? pnlUse : 0),
                     losePnL: (currentPosition?.losePnL || 0) + (returns < 0 ? returns : 0),
+                    maxPnLPerc: currentPosition ? (currentPosition.maxPnLPerc < pnlPerc ? pnlPerc : currentPosition.maxPnLPerc) : pnlPerc,
+                    minPnLPerc: currentPosition ? (currentPosition.minPnLPerc > pnlPerc ? pnlPerc : currentPosition.minPnLPerc) : pnlPerc,
+                    avgPPCount,
+                    avgPnLPerc,
                 }
                 // insert stats object
                 if (rankStat.pnl >= 0) {

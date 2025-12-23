@@ -279,10 +279,11 @@ export class TelegramEngine {
                     
                 }
                 let m = `${i + 1}. \`${rank.address}\`\n`;
-                m += `PnL 🟰 \`SOL ${FFF(rank.pnl)}\`\n`
+                m += `PnL 🟰 \`SOL ${FFF(rank.pnl)}\`\n`;
                 m += `Positions 🟰 \`${formatNumber(rank.positions)}\`\n`
-                m += `W n L 🟰 \`${formatNumber(rank.wins)} n ${formatNumber(rank.loses)} ${FFF(winsPerc)}%\`\n`
-                m += `WPnL n LPnL 🟰 \`SOL ${FFF(rank.winPnL)} n SOL ${FFF(rank.losePnL)}\`\n`
+                m += `W n L 🟰 \`${formatNumber(rank.wins)} n ${formatNumber(rank.loses)} ${FFF(winsPerc)}%\`\n`;
+                m += `WPnL n LPnL 🟰 \`SOL ${FFF(rank.winPnL)} n SOL ${FFF(rank.losePnL)}\`\n`;
+                m += `MaMiAv PnL 🟰 \`${FFF(rank.maxPnLPerc)}% ${FFF(rank.minPnLPerc)}% ${FFF(rank.avgPnLPerc)}%\`\n`;
                 return m;
             }).join("\n");
         }
